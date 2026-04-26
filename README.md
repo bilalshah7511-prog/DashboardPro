@@ -151,7 +151,7 @@ src/
 ### Multi-Admin Support
 - Any user can be promoted to admin role
 - Promoted admins get full admin functionality
-- Owner admin (admin@gmail.com) login activity not tracked
+- Owner admin login activity not tracked
 - Each admin can manage all users except themselves
 
 ### Profile Management
