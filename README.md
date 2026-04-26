@@ -7,11 +7,6 @@ A production-ready SaaS Dashboard application built with React, Vite, Tailwind C
 ![Tailwind](https://img.shields.io/badge/Tailwind-3.4.3-cyan)
 ![License](https://img.shields.io/badge/License-MIT-green)
 
-## 📖 Complete Documentation
-
-For detailed project documentation, architecture, and learning guide, see:
-**[PROJECT_DOCUMENTATION.md](./PROJECT_DOCUMENTATION.md)**
-
 ## 🚀 Quick Start
 
 ```bash
@@ -132,12 +127,9 @@ src/
 ## 🔑 Default Credentials
 
 ### Owner Admin Account
-- **Email**: `admin@gmail.com`
-- **Password**: `admin`
-
-### Create New User
-Use the signup page or admin "Add User" feature.
-
+- **Email**: `example@gmail.com`
+- **Password**: `abcd`
+- 
 ## 👤 User Roles
 
 ### Admin
@@ -159,7 +151,7 @@ Use the signup page or admin "Add User" feature.
 ### Multi-Admin Support
 - Any user can be promoted to admin role
 - Promoted admins get full admin functionality
-- Owner admin (admin@gmail.com) login activity not tracked
+- Owner admin login activity not tracked
 - Each admin can manage all users except themselves
 
 ### Profile Management
@@ -196,49 +188,8 @@ Use the signup page or admin "Add User" feature.
 
 All data is stored in browser's LocalStorage:
 
-```javascript
-{
-  users: [
-    {
-      id: "1714056000000",
-      name: "John Doe",
-      email: "john@example.com",
-      password: "password123",
-      role: "user",
-      gender: "Male",
-      profileImage: "data:image/png;base64,...",
-      createdAt: "2026-04-25T10:00:00.000Z"
-    }
-  ],
-  currentUser: { /* logged-in user object */ },
-  loginRecords: [
-    {
-      id: "1714056100000",
-      userId: "1714056000000",
-      timestamp: "2026-04-25T10:01:00.000Z"
-    }
-  ]
-}
+
 ```
-
-## 🚀 Deployment
-
-### Deploy to Vercel
-
-1. Push code to GitHub
-2. Go to [Vercel](https://vercel.com)
-3. Import repository
-4. Vercel auto-detects Vite configuration
-5. Click Deploy
-
-### Deploy to Netlify
-
-1. Push code to GitHub
-2. Go to [Netlify](https://netlify.com)
-3. Import repository
-4. Build command: `npm run build`
-5. Publish directory: `dist`
-6. Click Deploy
 
 ## 📱 Browser Support
 
@@ -262,35 +213,12 @@ This project demonstrates:
 - Protected routes
 - Role-based access control
 
-## 📝 Available Scripts
-
-```bash
-# Development
-npm run dev          # Start dev server at http://localhost:5173
-
-# Production
-npm run build        # Build for production
-npm run preview      # Preview production build
-
-# Dependencies
-npm install          # Install all dependencies
-```
-
 ## 🔧 Configuration Files
 
 - `vite.config.js` - Vite configuration
 - `tailwind.config.js` - Tailwind CSS configuration
 - `postcss.config.js` - PostCSS configuration
 - `package.json` - Dependencies and scripts
-
-## 🐛 Known Limitations
-
-- Data stored in LocalStorage (cleared when browser cache is cleared)
-- No backend API (all data is client-side)
-- No email verification
-- No password recovery
-- Image size limited to 2MB
-- No real-time updates across tabs
 
 ## 🔮 Future Enhancements
 
@@ -314,8 +242,6 @@ MIT License - feel free to use this project for learning or commercial purposes.
 This is a learning project. Feel free to fork and modify as needed.
 
 ## 📞 Support
-
-For detailed documentation, see [PROJECT_DOCUMENTATION.md](./PROJECT_DOCUMENTATION.md)
 
 ---
 
