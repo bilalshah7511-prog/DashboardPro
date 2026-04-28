@@ -51,10 +51,12 @@ app.use(cors({
 app.use(express.json({ limit: '10mb' }))
 app.use(express.urlencoded({ extended: true, limit: '10mb' }))
 
-// Rate limiting
+// Rate limiting - more lenient for development
 const limiter = rateLimit({
   windowMs: parseInt(process.env.RATE_LIMIT_WINDOW) * 60 * 1000 || 15 * 60 * 1000,
-  max: parseInt(process.env.RATE_LIMIT_MAX_REQUESTS) || 100,
+  max: process.env.NODE_ENV === 'production' 
+    ? (parseInt(process.env.RATE_LIMIT_MAX_REQUESTS) || 100)
+    : 1000, // Much higher limit for development
   message: 'Too many requests from this IP, please try again later.'
 })
 

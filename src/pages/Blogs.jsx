@@ -1,13 +1,16 @@
 import { useState, useEffect } from 'react'
 import { useAuth } from '../context/AuthContext'
 import { useNavigate } from 'react-router-dom'
+import { useTranslation } from 'react-i18next'
 import { blogAPI } from '../services/api'
 import { MdAdd, MdEdit, MdDelete, MdImage, MdSearch } from 'react-icons/md'
 import CreateBlogModal from '../components/CreateBlogModal'
 import EditBlogModal from '../components/EditBlogModal'
+import { BlogCardSkeletonGrid, EmptyState } from '../components/skeletons'
 
 const Blogs = () => {
   const { user } = useAuth()
+  const { t } = useTranslation()
   const navigate = useNavigate()
   const [activeTab, setActiveTab] = useState('all')
   const [allBlogs, setAllBlogs] = useState([])
@@ -74,52 +77,46 @@ const Blogs = () => {
     return titleMatch || authorMatch || tagMatch
   })
 
-  if (loading) {
-    return (
-      <div className="flex items-center justify-center h-64">
-        <div className="text-gray-600 dark:text-gray-400">Loading blogs...</div>
-      </div>
-    )
-  }
-
   return (
     <div>
       <div className="mb-6 flex justify-between items-center">
         <div>
-          <h1 className="text-3xl font-bold text-gray-800 dark:text-white">Blogs</h1>
-          <p className="text-gray-600 dark:text-gray-400 mt-1">Read and share your thoughts</p>
+          <h1 className="text-3xl font-bold text-gray-800 dark:text-white">{t('blogs')}</h1>
+          <p className="text-gray-600 dark:text-gray-400 mt-1">{t('readAndShare')}</p>
         </div>
         <button
           onClick={() => setShowCreateModal(true)}
           className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition flex items-center space-x-2"
         >
           <MdAdd className="w-5 h-5" />
-          <span>Create Blog</span>
+          <span>{t('createBlog')}</span>
         </button>
       </div>
 
-      {/* Tabs */}
+      {/* Tabs - Always visible */}
       <div className="bg-white dark:bg-gray-800 rounded-lg shadow mb-6">
         <div className="flex border-b border-gray-200 dark:border-gray-700">
           <button
             onClick={() => setActiveTab('all')}
-            className={`px-6 py-3 font-medium transition ${
+            disabled={loading}
+            className={`px-6 py-3 font-medium transition disabled:opacity-50 ${
               activeTab === 'all'
                 ? 'text-blue-600 dark:text-blue-400 border-b-2 border-blue-600 dark:border-blue-400'
                 : 'text-gray-600 dark:text-gray-400 hover:text-gray-800 dark:hover:text-gray-200'
             }`}
           >
-            All Blogs
+            {t('allBlogs')}
           </button>
           <button
             onClick={() => setActiveTab('my')}
-            className={`px-6 py-3 font-medium transition ${
+            disabled={loading}
+            className={`px-6 py-3 font-medium transition disabled:opacity-50 ${
               activeTab === 'my'
                 ? 'text-blue-600 dark:text-blue-400 border-b-2 border-blue-600 dark:border-blue-400'
                 : 'text-gray-600 dark:text-gray-400 hover:text-gray-800 dark:hover:text-gray-200'
             }`}
           >
-            My Blogs
+            {t('myBlogs')}
           </button>
         </div>
       </div>
@@ -130,22 +127,30 @@ const Blogs = () => {
           <MdSearch className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
           <input
             type="text"
-            placeholder="Search by title, author name, or tags..."
+            placeholder={t('search')}
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            className="w-full pl-10 pr-4 py-2 border border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none"
+            disabled={loading}
+            className="w-full pl-10 pr-4 py-2 border border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none disabled:opacity-50"
           />
         </div>
       </div>
 
+      {/* Loading Skeleton */}
+      {loading && <BlogCardSkeletonGrid count={6} />}
+
+      {/* Empty State */}
+      {!loading && filteredBlogs.length === 0 && (
+        <EmptyState 
+          icon="search"
+          title={searchQuery ? t('noData') : activeTab === 'all' ? t('noData') : t('noData')}
+          description={t('noData')}
+          action={activeTab === 'my' ? { label: t('createBlog'), onClick: () => setShowCreateModal(true) } : null}
+        />
+      )}
+
       {/* Blogs Grid */}
-      {filteredBlogs.length === 0 ? (
-        <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-12 text-center">
-          <p className="text-gray-500 dark:text-gray-400">
-            {searchQuery ? 'No blogs found matching your search' : activeTab === 'all' ? 'No blogs published yet' : 'You haven\'t created any blogs yet'}
-          </p>
-        </div>
-      ) : (
+      {!loading && filteredBlogs.length > 0 && (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           {filteredBlogs.map((blog) => (
             <div key={blog.id} className="bg-white dark:bg-gray-800 rounded-lg shadow hover:shadow-xl transition overflow-hidden">

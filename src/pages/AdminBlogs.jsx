@@ -1,67 +1,111 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
+import { useTranslation } from 'react-i18next'
 import { blogAPI } from '../services/api'
 import { MdCheck, MdClose, MdDelete, MdImage, MdFilterList } from 'react-icons/md'
+import { FaSpinner } from 'react-icons/fa'
+import { EmptyState } from '../components/skeletons'
 
 const AdminBlogs = () => {
   const navigate = useNavigate()
+  const { t } = useTranslation()
   const [blogs, setBlogs] = useState([])
   const [loading, setLoading] = useState(true)
   const [filterStatus, setFilterStatus] = useState('all')
+  const [actionLoading, setActionLoading] = useState({}) // Track loading state for each blog action
 
+  // Keep track of current request to prevent race conditions
+  const currentFilterRef = useRef(filterStatus)
+  
   useEffect(() => {
-    fetchBlogs()
+    currentFilterRef.current = filterStatus
   }, [filterStatus])
 
-  const fetchBlogs = async () => {
-    try {
+  // Fetch blogs when filter changes
+  useEffect(() => {
+    const fetchBlogsData = async () => {
       setLoading(true)
-      const status = filterStatus === 'all' ? null : filterStatus
+      try {
+        const status = filterStatus === 'all' ? null : filterStatus
+        const response = await blogAPI.getAllBlogsAdmin(status)
+        
+        // Only update if filter hasn't changed since request started
+        if (currentFilterRef.current === filterStatus) {
+          setBlogs(response.data.blogs || [])
+        }
+      } catch (error) {
+        if (currentFilterRef.current === filterStatus) {
+          console.error('Failed to fetch blogs:', error)
+        }
+      } finally {
+        if (currentFilterRef.current === filterStatus) {
+          setLoading(false)
+        }
+      }
+    }
+    
+    fetchBlogsData()
+  }, [filterStatus])
+  
+  // Refetch function for actions
+  const fetchBlogs = async () => {
+    const currentFilter = currentFilterRef.current
+    try {
+      const status = currentFilter === 'all' ? null : currentFilter
       const response = await blogAPI.getAllBlogsAdmin(status)
-      setBlogs(response.data.blogs)
+      if (currentFilterRef.current === currentFilter) {
+        setBlogs(response.data.blogs || [])
+      }
     } catch (error) {
       console.error('Failed to fetch blogs:', error)
-    } finally {
-      setLoading(false)
     }
   }
 
   const handleApprove = async (id) => {
+    setActionLoading({ ...actionLoading, [`approve-${id}`]: true })
     try {
       await blogAPI.approveBlog(id)
       fetchBlogs()
     } catch (error) {
-      alert(error.response?.data?.message || 'Failed to approve blog')
+      alert(error.response?.data?.message || t('error'))
+    } finally {
+      setActionLoading({ ...actionLoading, [`approve-${id}`]: false })
     }
   }
 
   const handleReject = async (id) => {
-    if (window.confirm('Are you sure you want to reject this blog?')) {
+    if (window.confirm(t('confirmReject'))) {
+      setActionLoading({ ...actionLoading, [`reject-${id}`]: true })
       try {
         await blogAPI.rejectBlog(id)
         fetchBlogs()
       } catch (error) {
-        alert(error.response?.data?.message || 'Failed to reject blog')
+        alert(error.response?.data?.message || t('error'))
+      } finally {
+        setActionLoading({ ...actionLoading, [`reject-${id}`]: false })
       }
     }
   }
 
   const handleDelete = async (id) => {
-    if (window.confirm('Are you sure you want to delete this blog permanently?')) {
+    if (window.confirm(t('confirmDeleteBlog'))) {
+      setActionLoading({ ...actionLoading, [`delete-${id}`]: true })
       try {
         await blogAPI.deleteBlog(id)
         fetchBlogs()
       } catch (error) {
-        alert(error.response?.data?.message || 'Failed to delete blog')
+        alert(error.response?.data?.message || t('error'))
+      } finally {
+        setActionLoading({ ...actionLoading, [`delete-${id}`]: false })
       }
     }
   }
 
   const getStatusBadge = (status) => {
     const badges = {
-      pending: { bg: 'bg-yellow-100 dark:bg-yellow-900/30', text: 'text-yellow-800 dark:text-yellow-300', label: 'PENDING' },
-      approved: { bg: 'bg-green-100 dark:bg-green-900/30', text: 'text-green-800 dark:text-green-300', label: 'APPROVED' },
-      rejected: { bg: 'bg-red-100 dark:bg-red-900/30', text: 'text-red-800 dark:text-red-300', label: 'REJECTED' }
+      pending: { bg: 'bg-yellow-100 dark:bg-yellow-900/30', text: 'text-yellow-800 dark:text-yellow-300', label: t('pending') },
+      approved: { bg: 'bg-green-100 dark:bg-green-900/30', text: 'text-green-800 dark:text-green-300', label: t('approved') },
+      rejected: { bg: 'bg-red-100 dark:bg-red-900/30', text: 'text-red-800 dark:text-red-300', label: t('rejected') }
     }
     return badges[status] || badges.pending
   }
@@ -73,46 +117,74 @@ const AdminBlogs = () => {
     rejected: blogs.filter(b => b.status === 'rejected').length
   }
 
-  if (loading) {
-    return (
-      <div className="flex items-center justify-center h-64">
-        <div className="text-gray-600 dark:text-gray-400">Loading blogs...</div>
-      </div>
-    )
-  }
-
   return (
     <div>
       <div className="mb-6">
-        <h1 className="text-3xl font-bold text-gray-800 dark:text-white">Blog Management</h1>
-        <p className="text-gray-600 dark:text-gray-400 mt-1">Review and manage user blogs</p>
+        <h1 className="text-3xl font-bold text-gray-800 dark:text-white">{t('blogManagement')}</h1>
+        <p className="text-gray-600 dark:text-gray-400 mt-1">{t('reviewAndManage')}</p>
       </div>
 
-      {/* Filter Tabs */}
+      {/* Filter Tabs - Always visible */}
       <div className="bg-white dark:bg-gray-800 rounded-lg shadow mb-6">
         <div className="flex border-b border-gray-200 dark:border-gray-700 overflow-x-auto">
           {['all', 'pending', 'approved', 'rejected'].map((status) => (
             <button
               key={status}
               onClick={() => setFilterStatus(status)}
-              className={`px-6 py-3 font-medium transition whitespace-nowrap ${
+              disabled={loading}
+              className={`px-6 py-3 font-medium transition whitespace-nowrap disabled:opacity-50 ${
                 filterStatus === status
                   ? 'text-blue-600 dark:text-blue-400 border-b-2 border-blue-600 dark:border-blue-400'
                   : 'text-gray-600 dark:text-gray-400 hover:text-gray-800 dark:hover:text-gray-200'
               }`}
             >
-              {status.charAt(0).toUpperCase() + status.slice(1)} ({statusCounts[status]})
+              {t(status)}
             </button>
           ))}
         </div>
       </div>
 
-      {/* Blogs List */}
-      {blogs.length === 0 ? (
-        <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-12 text-center">
-          <p className="text-gray-500 dark:text-gray-400">No blogs found</p>
+      {/* Loading Skeleton */}
+      {loading && (
+        <div className="space-y-4">
+          {[1, 2, 3].map((i) => (
+            <div key={i} className="bg-white dark:bg-gray-800 rounded-lg shadow animate-pulse">
+              <div className="p-6">
+                <div className="flex flex-col md:flex-row gap-6">
+                  <div className="flex-shrink-0">
+                    <div className="w-full md:w-48 h-32 bg-gray-200 dark:bg-gray-700 rounded-lg" />
+                  </div>
+                  <div className="flex-1 space-y-3">
+                    <div className="flex gap-2">
+                      <div className="h-5 w-16 bg-gray-200 dark:bg-gray-700 rounded-full" />
+                      <div className="h-4 w-24 bg-gray-200 dark:bg-gray-700 rounded" />
+                    </div>
+                    <div className="h-6 bg-gray-200 dark:bg-gray-700 rounded w-3/4" />
+                    <div className="h-4 bg-gray-200 dark:bg-gray-700 rounded w-full" />
+                    <div className="h-4 bg-gray-200 dark:bg-gray-700 rounded w-2/3" />
+                    <div className="flex items-center gap-2 pt-2">
+                      <div className="h-6 w-6 bg-gray-200 dark:bg-gray-700 rounded-full" />
+                      <div className="h-4 w-32 bg-gray-200 dark:bg-gray-700 rounded" />
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          ))}
         </div>
-      ) : (
+      )}
+
+      {/* Empty State */}
+      {!loading && blogs.length === 0 && (
+        <EmptyState 
+          icon="file"
+          title={filterStatus === 'all' ? t('noBlogs') : t('noStatusBlogs', { status: t(filterStatus) })}
+          description={filterStatus === 'all' ? t('noBlogsDesc') : t('noStatusBlogsDesc', { status: t(filterStatus) })}
+        />
+      )}
+
+      {/* Blogs List */}
+      {!loading && blogs.length > 0 && (
         <div className="space-y-4">
           {blogs.map((blog) => {
             const badge = getStatusBadge(blog.status)
@@ -191,39 +263,59 @@ const AdminBlogs = () => {
                         <>
                           <button
                             onClick={() => handleApprove(blog.id)}
-                            className="flex items-center justify-center px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition"
-                            title="Approve"
+                            disabled={actionLoading[`approve-${blog.id}`]}
+                            className="flex items-center justify-center px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition disabled:opacity-50 disabled:cursor-not-allowed"
+                            title={t('approved')}
                           >
-                            <MdCheck className="w-5 h-5 md:mr-2" />
-                            <span className="hidden md:inline">Approve</span>
+                            {actionLoading[`approve-${blog.id}`] ? (
+                              <FaSpinner className="w-5 h-5 animate-spin md:mr-2" />
+                            ) : (
+                              <MdCheck className="w-5 h-5 md:mr-2" />
+                            )}
+                            <span className="hidden md:inline">{t('approved')}</span>
                           </button>
                           <button
                             onClick={() => handleReject(blog.id)}
-                            className="flex items-center justify-center px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition"
-                            title="Reject"
+                            disabled={actionLoading[`reject-${blog.id}`]}
+                            className="flex items-center justify-center px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition disabled:opacity-50 disabled:cursor-not-allowed"
+                            title={t('rejected')}
                           >
-                            <MdClose className="w-5 h-5 md:mr-2" />
-                            <span className="hidden md:inline">Reject</span>
+                            {actionLoading[`reject-${blog.id}`] ? (
+                              <FaSpinner className="w-5 h-5 animate-spin md:mr-2" />
+                            ) : (
+                              <MdClose className="w-5 h-5 md:mr-2" />
+                            )}
+                            <span className="hidden md:inline">{t('rejected')}</span>
                           </button>
                         </>
                       )}
                       {blog.status === 'rejected' && (
                         <button
                           onClick={() => handleApprove(blog.id)}
-                          className="flex items-center justify-center px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition"
-                          title="Approve"
+                          disabled={actionLoading[`approve-${blog.id}`]}
+                          className="flex items-center justify-center px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition disabled:opacity-50 disabled:cursor-not-allowed"
+                          title={t('approved')}
                         >
-                          <MdCheck className="w-5 h-5 md:mr-2" />
-                          <span className="hidden md:inline">Approve</span>
+                          {actionLoading[`approve-${blog.id}`] ? (
+                            <FaSpinner className="w-5 h-5 animate-spin md:mr-2" />
+                          ) : (
+                            <MdCheck className="w-5 h-5 md:mr-2" />
+                          )}
+                          <span className="hidden md:inline">{t('approved')}</span>
                         </button>
                       )}
                       <button
                         onClick={() => handleDelete(blog.id)}
-                        className="flex items-center justify-center px-4 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700 transition"
-                        title="Delete"
+                        disabled={actionLoading[`delete-${blog.id}`]}
+                        className="flex items-center justify-center px-4 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700 transition disabled:opacity-50 disabled:cursor-not-allowed"
+                        title={t('delete')}
                       >
-                        <MdDelete className="w-5 h-5 md:mr-2" />
-                        <span className="hidden md:inline">Delete</span>
+                        {actionLoading[`delete-${blog.id}`] ? (
+                          <FaSpinner className="w-5 h-5 animate-spin md:mr-2" />
+                        ) : (
+                          <MdDelete className="w-5 h-5 md:mr-2" />
+                        )}
+                        <span className="hidden md:inline">{t('delete')}</span>
                       </button>
                     </div>
                   </div>

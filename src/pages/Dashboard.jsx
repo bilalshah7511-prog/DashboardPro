@@ -6,6 +6,7 @@ import socketService from '../services/socket'
 import StatsCard from '../components/StatsCard'
 import EditProfileModal from '../components/EditProfileModal'
 import LoginDetailsModal from '../components/LoginDetailsModal'
+import { StatsSkeletonGrid } from '../components/skeletons'
 import { MdPeople, MdLock, MdBarChart, MdSettings, MdAccessTime, MdCheckCircle, MdCalendarToday, MdEdit } from 'react-icons/md'
 
 const Dashboard = () => {
@@ -45,25 +46,17 @@ const Dashboard = () => {
     }
   }
 
-  if (loading) {
-    return (
-      <div className="flex items-center justify-center h-64">
-        <div className="text-gray-600 dark:text-gray-400">{t('loading')}</div>
-      </div>
-    )
-  }
-
   const statsCards = isAdmin()
     ? [
         { title: t('totalUsers'), value: stats?.totalUsers || 0, icon: MdPeople, color: 'blue', clickable: false },
         { title: t('totalLogins'), value: stats?.totalLogins || 0, icon: MdLock, color: 'green', clickable: true, onClick: () => setShowLoginModal(true) },
         { title: t('activeUsers'), value: stats?.activeToday || 0, icon: MdBarChart, color: 'purple', clickable: false },
-        { title: 'Admin Panel', value: 'Active', icon: MdSettings, color: 'orange', clickable: false }
+        { title: t('adminPanel'), value: t('active'), icon: MdSettings, color: 'orange', clickable: false }
       ]
     : [
-        { title: 'My Logins', value: stats?.userLogins || 0, icon: MdLock, color: 'blue', clickable: true, onClick: () => setShowLoginModal(true) },
+        { title: t('myLogins'), value: stats?.userLogins || 0, icon: MdLock, color: 'blue', clickable: true, onClick: () => setShowLoginModal(true) },
         { title: t('lastLogin'), value: stats?.lastLogin ? new Date(stats.lastLogin).toLocaleString() : 'N/A', icon: MdAccessTime, color: 'green', clickable: false },
-        { title: 'Account Status', value: 'Active', icon: MdCheckCircle, color: 'purple', clickable: false },
+        { title: t('accountStatus'), value: t('active'), icon: MdCheckCircle, color: 'purple', clickable: false },
         { title: t('createdAt'), value: user?.created_at ? new Date(user.created_at).toLocaleDateString() : 'N/A', icon: MdCalendarToday, color: 'orange', clickable: false }
       ]
 
@@ -76,15 +69,21 @@ const Dashboard = () => {
         <p className="text-gray-600 dark:text-gray-400 mt-1">{t('recentActivity')}</p>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-        {statsCards.map((stat, index) => (
-          <StatsCard key={index} {...stat} />
-        ))}
-      </div>
+      {/* Stats Skeleton */}
+      {loading && <StatsSkeletonGrid count={4} />}
+
+      {/* Stats Cards */}
+      {!loading && (
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+          {statsCards.map((stat, index) => (
+            <StatsCard key={index} {...stat} />
+          ))}
+        </div>
+      )}
 
       <div className="mt-8 bg-white dark:bg-gray-800 rounded-lg shadow p-6 transition-colors">
         <div className="flex justify-between items-center mb-6">
-          <h2 className="text-xl font-semibold text-gray-800 dark:text-white">Account Information</h2>
+          <h2 className="text-xl font-semibold text-gray-800 dark:text-white">{t('profile')}</h2>
           <button
             onClick={() => setShowEditModal(true)}
             className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition flex items-center space-x-2"

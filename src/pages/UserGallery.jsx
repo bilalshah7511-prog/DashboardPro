@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import { useAuth } from '../context/AuthContext'
 import { userAPI } from '../services/api'
 import socketService from '../services/socket'
+import { EmptyState } from '../components/skeletons'
 import { FaMale, FaFemale, FaGenderless, FaCalendarAlt, FaShieldAlt } from 'react-icons/fa'
 
 const UserGallery = () => {
@@ -58,14 +59,6 @@ const UserGallery = () => {
     })
   }
 
-  if (loading) {
-    return (
-      <div className="flex items-center justify-center h-64">
-        <div className="text-gray-600 dark:text-gray-400">Loading users...</div>
-      </div>
-    )
-  }
-
   return (
     <div>
       <div className="mb-6">
@@ -73,11 +66,40 @@ const UserGallery = () => {
         <p className="text-gray-600 dark:text-gray-400 mt-1">View all registered user profiles and information</p>
       </div>
 
-      {users.length === 0 ? (
-        <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-12 text-center">
-          <p className="text-gray-500 dark:text-gray-400">No users found</p>
+      {/* Loading Skeleton */}
+      {loading && (
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+          {[1, 2, 3, 4, 5, 6, 7, 8].map((i) => (
+            <div key={i} className="bg-white dark:bg-gray-800 rounded-xl shadow-lg overflow-hidden animate-pulse">
+              <div className="bg-gray-200 dark:bg-gray-700 h-24" />
+              <div className="px-6 pb-6 pt-4">
+                <div className="w-24 h-24 rounded-full bg-gray-200 dark:bg-gray-700 -mt-12 mx-auto border-4 border-white dark:border-gray-800" />
+                <div className="mt-4 space-y-3">
+                  <div className="h-6 bg-gray-200 dark:bg-gray-700 rounded w-3/4 mx-auto" />
+                  <div className="h-4 bg-gray-200 dark:bg-gray-700 rounded w-1/2 mx-auto" />
+                  <div className="space-y-2 pt-2">
+                    <div className="h-12 bg-gray-200 dark:bg-gray-700 rounded" />
+                    <div className="h-12 bg-gray-200 dark:bg-gray-700 rounded" />
+                    <div className="h-12 bg-gray-200 dark:bg-gray-700 rounded" />
+                  </div>
+                </div>
+              </div>
+            </div>
+          ))}
         </div>
-      ) : (
+      )}
+
+      {/* Empty State */}
+      {!loading && users.length === 0 && (
+        <EmptyState 
+          icon="folder"
+          title="No users found"
+          description="There are no registered users yet."
+        />
+      )}
+
+      {/* Users Grid */}
+      {!loading && users.length > 0 && (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
           {users.map((user) => (
             <div key={user.id} className="bg-white dark:bg-gray-800 rounded-xl shadow-lg hover:shadow-2xl transition-all duration-300 overflow-hidden">

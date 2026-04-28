@@ -13,10 +13,10 @@ const Sidebar = ({ sidebarOpen, setSidebarOpen }) => {
     { name: t('dashboard'), path: '/dashboard', icon: MdDashboard },
     ...(isAdmin() ? [
       { name: t('users'), path: '/users', icon: MdPeople },
-      { name: 'Profiles', path: '/gallery', icon: MdPhotoLibrary },
-      { name: 'Blog Management', path: '/admin/blogs', icon: MdArticle }
+      { name: t('profiles'), path: '/gallery', icon: MdPhotoLibrary },
+      { name: t('blogManagement'), path: '/admin/blogs', icon: MdArticle }
     ] : []),
-    { name: 'Blogs', path: '/blogs', icon: MdArticle },
+    { name: t('blogs'), path: '/blogs', icon: MdArticle },
     { name: t('analytics'), path: '/analytics', icon: MdAnalytics }
   ]
 

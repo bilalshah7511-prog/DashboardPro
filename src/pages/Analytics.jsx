@@ -1,11 +1,14 @@
 import { useState, useEffect } from 'react'
 import { useAuth } from '../context/AuthContext'
 import { useTheme } from '../context/ThemeContext'
+import { useTranslation } from 'react-i18next'
 import { userAPI } from '../services/api'
+import { EmptyState } from '../components/skeletons'
 import { LineChart, Line, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts'
 
 const Analytics = () => {
   const { user, isAdmin } = useAuth()
+  const { t } = useTranslation()
   const { theme } = useTheme()
   const [loginRecords, setLoginRecords] = useState([])
   const [users, setUsers] = useState([])
@@ -42,31 +45,53 @@ const Analytics = () => {
   const monthlyData = getMonthlyLoginData(loginRecords)
   const userActivityData = isAdmin() ? getUserActivityData(users, loginRecords) : []
 
-  if (loading) {
-    return (
-      <div className="flex items-center justify-center h-64">
-        <div className="text-gray-600 dark:text-gray-400">Loading analytics...</div>
-      </div>
-    )
-  }
-
   return (
     <div>
       <div className="mb-6">
-        <h1 className="text-3xl font-bold text-gray-800 dark:text-white">Analytics</h1>
+        <h1 className="text-3xl font-bold text-gray-800 dark:text-white">{t('analytics')}</h1>
         <p className="text-gray-600 dark:text-gray-400 mt-1">
-          {isAdmin() ? 'Overview of all user activity' : 'Your login activity'}
+          {isAdmin() ? t('allUserActivity') : t('yourLoginActivity')}
         </p>
       </div>
 
-      {loginRecords.length === 0 ? (
-        <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-12 text-center">
-          <p className="text-gray-500 dark:text-gray-400">No login data available yet</p>
+      {/* Loading Skeleton */}
+      {loading && (
+        <div className="space-y-6">
+          {/* Chart Skeletons */}
+          <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-6 animate-pulse">
+            <div className="h-6 bg-gray-200 dark:bg-gray-700 rounded w-48 mb-4" />
+            <div className="h-[300px] bg-gray-200 dark:bg-gray-700 rounded" />
+          </div>
+          <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-6 animate-pulse">
+            <div className="h-6 bg-gray-200 dark:bg-gray-700 rounded w-48 mb-4" />
+            <div className="h-[300px] bg-gray-200 dark:bg-gray-700 rounded" />
+          </div>
+          {/* Table Skeleton */}
+          <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-6 animate-pulse">
+            <div className="h-6 bg-gray-200 dark:bg-gray-700 rounded w-48 mb-4" />
+            <div className="space-y-3">
+              {[1, 2, 3, 4, 5].map((i) => (
+                <div key={i} className="h-12 bg-gray-200 dark:bg-gray-700 rounded" />
+              ))}
+            </div>
+          </div>
         </div>
-      ) : (
+      )}
+
+      {/* Empty State */}
+      {!loading && loginRecords.length === 0 && (
+        <EmptyState 
+          icon="inbox"
+          title={t('noData')}
+          description={t('noData')}
+        />
+      )}
+
+      {/* Analytics Content */}
+      {!loading && loginRecords.length > 0 && (
         <div className="space-y-6">
           <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-6">
-            <h2 className="text-xl font-semibold text-gray-800 dark:text-white mb-4">Daily Login Activity</h2>
+            <h2 className="text-xl font-semibold text-gray-800 dark:text-white mb-4">{t('dailyLoginActivity')}</h2>
             <ResponsiveContainer width="100%" height={300}>
               <LineChart data={dailyData}>
                 <CartesianGrid strokeDasharray="3 3" stroke={isDark ? '#374151' : '#e5e7eb'} />
@@ -86,7 +111,7 @@ const Analytics = () => {
           </div>
 
           <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-6">
-            <h2 className="text-xl font-semibold text-gray-800 dark:text-white mb-4">Monthly Login Trends</h2>
+            <h2 className="text-xl font-semibold text-gray-800 dark:text-white mb-4">{t('monthlyLoginTrends')}</h2>
             <ResponsiveContainer width="100%" height={300}>
               <BarChart data={monthlyData}>
                 <CartesianGrid strokeDasharray="3 3" stroke={isDark ? '#374151' : '#e5e7eb'} />
@@ -107,7 +132,7 @@ const Analytics = () => {
 
           {isAdmin() && userActivityData.length > 0 && (
             <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-6">
-              <h2 className="text-xl font-semibold text-gray-800 dark:text-white mb-4">User Activity Overview</h2>
+              <h2 className="text-xl font-semibold text-gray-800 dark:text-white mb-4">{t('userActivityOverview')}</h2>
               <ResponsiveContainer width="100%" height={300}>
                 <BarChart data={userActivityData}>
                   <CartesianGrid strokeDasharray="3 3" stroke={isDark ? '#374151' : '#e5e7eb'} />
@@ -128,29 +153,29 @@ const Analytics = () => {
           )}
 
           <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-6">
-            <h2 className="text-xl font-semibold text-gray-800 dark:text-white mb-4">Recent Login History</h2>
+            <h2 className="text-xl font-semibold text-gray-800 dark:text-white mb-4">{t('recentLoginHistory')}</h2>
             <div className="overflow-x-auto">
               <table className="w-full">
                 <thead className="bg-gray-50 dark:bg-gray-700">
                   <tr>
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
-                      Date & Time
+                      {t('dateAndTime')}
                     </th>
                     {isAdmin() && (
                       <>
                         <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
-                          User
+                          {t('name')}
                         </th>
                         <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
-                          Email
+                          {t('email')}
                         </th>
                       </>
                     )}
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
-                      IP Address
+                      {t('ipAddress')}
                     </th>
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
-                      Status
+                      {t('status')}
                     </th>
                   </tr>
                 </thead>
