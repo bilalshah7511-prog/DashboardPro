@@ -19,6 +19,11 @@ dotenv.config()
 const app = express()
 const httpServer = createServer(app)
 
+// Trust proxy for Railway deployment
+if (process.env.NODE_ENV === 'production') {
+  app.set('trust proxy', 1)
+}
+
 // Allowed origins for CORS
 const allowedOrigins = [
   'http://localhost:5173',

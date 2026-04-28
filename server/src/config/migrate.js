@@ -75,6 +75,23 @@ const createTables = async () => {
       console.log('✅ Default admin user created')
     }
 
+    // Create blogs table
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS blogs (
+        id SERIAL PRIMARY KEY,
+        user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        title VARCHAR(255) NOT NULL,
+        description TEXT NOT NULL,
+        featured_image TEXT,
+        tags TEXT[],
+        status VARCHAR(20) DEFAULT 'pending' CHECK (status IN ('pending', 'approved', 'rejected')),
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        published_at TIMESTAMP
+      )
+    `)
+    console.log('✅ Blogs table created')
+
     console.log('🎉 Database migration completed successfully!')
     process.exit(0)
   } catch (error) {
