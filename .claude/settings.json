@@ -1,0 +1,27 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(pkill -f \"node src/server.js\")",
+      "Bash(curl -s -H 'Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9' http://localhost:5000/api/auth/me)",
+      "Bash(PGPASSWORD=bilaljee7511@ psql -U postgres -d dashpro_db -c \"SELECT id, name, email, profile_image IS NOT NULL as has_image FROM users WHERE email = 'admin@gmail.com';\")",
+      "Bash(net start *)",
+      "Bash(sc start *)",
+      "Bash(netstat -ano)",
+      "Bash(taskkill /F /PID 24256)",
+      "PowerShell(Stop-Process -Id 24256 -Force)",
+      "PowerShell(Start-Service -Name \"postgresql-x64-18\")",
+      "PowerShell(Start-Process powershell -Verb RunAs -ArgumentList \"-Command Start-Service postgresql-x64-18\" -Wait)",
+      "Read(//c/Program Files/PostgreSQL/**)",
+      "Bash(sc query *)",
+      "Bash(\"C:/Program Files/PostgreSQL/15/bin/pg_ctl.exe\" -D \"C:/Program Files/PostgreSQL/15/data\" status)",
+      "PowerShell(& \"C:\\\\Program Files\\\\PostgreSQL\\\\15\\\\bin\\\\pg_ctl.exe\" -D \"C:\\\\Program Files\\\\PostgreSQL\\\\15\\\\data\" status)",
+      "PowerShell(Start-Process -FilePath \"C:\\\\Program Files\\\\PostgreSQL\\\\15\\\\bin\\\\postgres.exe\" -ArgumentList \"-D `\"C:\\\\Program Files\\\\PostgreSQL\\\\15\\\\data`\"\" -WindowStyle Hidden)",
+      "PowerShell(Stop-Process -Id 15264 -Force)",
+      "Bash(curl -s http://localhost:5000/api/users -H \"Authorization: Bearer $\\(cat server/.env)",
+      "Bash(PGPASSWORD=bilaljee7511@ psql -h localhost -U postgres -d dashpro_db -c \"SELECT id, name, email, role, has_image, LENGTH\\(profile_image\\) as image_size FROM users;\")",
+      "Bash(PGPASSWORD=bilaljee7511@ psql -h localhost -U postgres -d dashpro_db -c \"SELECT id, name, email, role, LENGTH\\(profile_image\\) as image_size FROM users;\")",
+      "Bash(node src/config/blogMigration.js)",
+      "Bash(npm list *)"
+    ]
+  }
+}

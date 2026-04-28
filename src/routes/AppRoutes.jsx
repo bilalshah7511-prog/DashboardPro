@@ -7,6 +7,9 @@ import Dashboard from '../pages/Dashboard'
 import Users from '../pages/Users'
 import UserGallery from '../pages/UserGallery'
 import Analytics from '../pages/Analytics'
+import Blogs from '../pages/Blogs'
+import BlogDetail from '../pages/BlogDetail'
+import AdminBlogs from '../pages/AdminBlogs'
 import DashboardLayout from '../components/DashboardLayout'
 
 const AppRoutes = () => {
@@ -22,6 +25,9 @@ const AppRoutes = () => {
         <Route path="dashboard" element={<Dashboard />} />
         <Route path="users" element={<ProtectedRoute adminOnly><Users /></ProtectedRoute>} />
         <Route path="gallery" element={<ProtectedRoute adminOnly><UserGallery /></ProtectedRoute>} />
+        <Route path="blogs" element={<Blogs />} />
+        <Route path="blogs/:id" element={<BlogDetail />} />
+        <Route path="admin/blogs" element={<ProtectedRoute adminOnly><AdminBlogs /></ProtectedRoute>} />
         <Route path="analytics" element={<Analytics />} />
       </Route>
 

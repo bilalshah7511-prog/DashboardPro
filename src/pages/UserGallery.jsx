@@ -1,12 +1,42 @@
-import { getUsers } from '../utils/storage'
+import { useState, useEffect } from 'react'
 import { useAuth } from '../context/AuthContext'
-import { FaMale, FaFemale, FaGenderless, FaCalendarAlt, FaShieldAlt, FaUserCircle } from 'react-icons/fa'
+import { userAPI } from '../services/api'
+import socketService from '../services/socket'
+import { FaMale, FaFemale, FaGenderless, FaCalendarAlt, FaShieldAlt } from 'react-icons/fa'
 
 const UserGallery = () => {
   const { user: currentUser } = useAuth()
+  const [users, setUsers] = useState([])
+  const [loading, setLoading] = useState(true)
 
-  // Show all users except the current logged-in admin
-  const users = getUsers().filter(u => u.id !== currentUser?.id)
+  useEffect(() => {
+    fetchUsers()
+
+    // Listen for real-time updates
+    socketService.onNewUser(() => fetchUsers())
+    socketService.onProfileChanged(() => fetchUsers())
+    socketService.onRoleUpdated(() => fetchUsers())
+    socketService.onUserListUpdated(() => fetchUsers())
+
+    return () => {
+      socketService.off('new_user')
+      socketService.off('profile_changed')
+      socketService.off('role_updated')
+      socketService.off('user_list_updated')
+    }
+  }, [])
+
+  const fetchUsers = async () => {
+    try {
+      const response = await userAPI.getAll()
+      // Show all users
+      setUsers(response.data.users)
+    } catch (error) {
+      console.error('Failed to fetch users:', error)
+    } finally {
+      setLoading(false)
+    }
+  }
 
   const getGenderIcon = (gender) => {
     switch(gender) {
@@ -28,34 +58,42 @@ const UserGallery = () => {
     })
   }
 
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center h-64">
+        <div className="text-gray-600 dark:text-gray-400">Loading users...</div>
+      </div>
+    )
+  }
+
   return (
     <div>
       <div className="mb-6">
-        <h1 className="text-3xl font-bold text-gray-800">User Profiles</h1>
-        <p className="text-gray-600 mt-1">View all registered user profiles and information</p>
+        <h1 className="text-3xl font-bold text-gray-800 dark:text-white">User Profiles</h1>
+        <p className="text-gray-600 dark:text-gray-400 mt-1">View all registered user profiles and information</p>
       </div>
 
       {users.length === 0 ? (
-        <div className="bg-white rounded-lg shadow p-12 text-center">
-          <p className="text-gray-500">No users found</p>
+        <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-12 text-center">
+          <p className="text-gray-500 dark:text-gray-400">No users found</p>
         </div>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
           {users.map((user) => (
-            <div key={user.id} className="bg-white rounded-xl shadow-lg hover:shadow-2xl transition-all duration-300 overflow-hidden">
+            <div key={user.id} className="bg-white dark:bg-gray-800 rounded-xl shadow-lg hover:shadow-2xl transition-all duration-300 overflow-hidden">
               {/* Header with gradient background */}
               <div className="bg-gradient-to-r from-blue-500 to-purple-600 h-24"></div>
 
               {/* Profile Image */}
               <div className="relative px-6 -mt-12">
-                {user.profileImage ? (
+                {user.profile_image ? (
                   <img
-                    src={user.profileImage}
+                    src={user.profile_image}
                     alt={user.name}
-                    className="w-24 h-24 rounded-full object-cover border-4 border-white shadow-lg mx-auto"
+                    className="w-24 h-24 rounded-full object-cover border-4 border-white dark:border-gray-800 shadow-lg mx-auto"
                   />
                 ) : (
-                  <div className="w-24 h-24 rounded-full bg-gradient-to-br from-blue-600 to-purple-600 flex items-center justify-center text-white text-3xl font-bold border-4 border-white shadow-lg mx-auto">
+                  <div className="w-24 h-24 rounded-full bg-gradient-to-br from-blue-600 to-purple-600 flex items-center justify-center text-white text-3xl font-bold border-4 border-white dark:border-gray-800 shadow-lg mx-auto">
                     {user.name?.charAt(0).toUpperCase()}
                   </div>
                 )}
@@ -63,42 +101,42 @@ const UserGallery = () => {
 
               {/* User Info */}
               <div className="px-6 pb-6 pt-4">
-                <h3 className="text-xl font-bold text-gray-800 text-center mb-1">{user.name}</h3>
-                <p className="text-sm text-gray-500 text-center mb-4">{user.email}</p>
+                <h3 className="text-xl font-bold text-gray-800 dark:text-white text-center mb-1">{user.name}</h3>
+                <p className="text-sm text-gray-500 dark:text-gray-400 text-center mb-4">{user.email}</p>
 
                 {/* Details Grid */}
                 <div className="space-y-3">
                   {/* Gender */}
-                  <div className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+                  <div className="flex items-center justify-between p-3 bg-gray-50 dark:bg-gray-700 rounded-lg">
                     <div className="flex items-center space-x-2">
                       {getGenderIcon(user.gender)}
-                      <span className="text-sm font-medium text-gray-600">Gender</span>
+                      <span className="text-sm font-medium text-gray-600 dark:text-gray-300">Gender</span>
                     </div>
-                    <span className="text-sm font-semibold text-gray-800">{user.gender || 'Not specified'}</span>
+                    <span className="text-sm font-semibold text-gray-800 dark:text-white">{user.gender || 'Not specified'}</span>
                   </div>
 
                   {/* Role */}
-                  <div className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+                  <div className="flex items-center justify-between p-3 bg-gray-50 dark:bg-gray-700 rounded-lg">
                     <div className="flex items-center space-x-2">
                       <FaShieldAlt className="text-purple-600" />
-                      <span className="text-sm font-medium text-gray-600">Role</span>
+                      <span className="text-sm font-medium text-gray-600 dark:text-gray-300">Role</span>
                     </div>
                     <span className={`px-3 py-1 text-xs font-bold rounded-full ${
                       user.role === 'admin'
-                        ? 'bg-purple-100 text-purple-800'
-                        : 'bg-green-100 text-green-800'
+                        ? 'bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-300'
+                        : 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-300'
                     }`}>
                       {user.role.toUpperCase()}
                     </span>
                   </div>
 
                   {/* Join Date */}
-                  <div className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+                  <div className="flex items-center justify-between p-3 bg-gray-50 dark:bg-gray-700 rounded-lg">
                     <div className="flex items-center space-x-2">
                       <FaCalendarAlt className="text-orange-600" />
-                      <span className="text-sm font-medium text-gray-600">Joined</span>
+                      <span className="text-sm font-medium text-gray-600 dark:text-gray-300">Joined</span>
                     </div>
-                    <span className="text-sm font-semibold text-gray-800">{formatDate(user.createdAt)}</span>
+                    <span className="text-sm font-semibold text-gray-800 dark:text-white">{formatDate(user.created_at)}</span>
                   </div>
                 </div>
               </div>

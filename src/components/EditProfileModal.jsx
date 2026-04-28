@@ -1,15 +1,18 @@
 import { useState } from 'react'
 import { useAuth } from '../context/AuthContext'
-import { updateUser } from '../utils/storage'
+import { useTranslation } from 'react-i18next'
+import { userAPI, authAPI } from '../services/api'
+import socketService from '../services/socket'
 import { MdClose, MdCameraAlt } from 'react-icons/md'
 
 const EditProfileModal = ({ onClose }) => {
-  const { user, isAdmin, login } = useAuth()
+  const { user, isAdmin, updateUser } = useAuth()
+  const { t } = useTranslation()
   const [formData, setFormData] = useState({
     name: user?.name || '',
     email: user?.email || '',
     gender: user?.gender || 'Not specified',
-    profileImage: user?.profileImage || '',
+    profile_image: user?.profile_image || '',
     currentPassword: '',
     newPassword: '',
     confirmPassword: ''
@@ -34,13 +37,49 @@ const EditProfileModal = ({ onClose }) => {
 
       const reader = new FileReader()
       reader.onloadend = () => {
-        setFormData({ ...formData, profileImage: reader.result })
+        const imageData = reader.result
+        setFormData({ ...formData, profile_image: imageData })
+
+        // Immediately update profile image
+        updateProfileImage(imageData)
       }
       reader.readAsDataURL(file)
     }
   }
 
-  const handleSubmit = (e) => {
+  const updateProfileImage = async (imageData) => {
+    try {
+      const response = await userAPI.updateProfile({ profileImage: imageData })
+      const updatedUser = response.data.user
+
+      // Update local state with new profile image
+      setFormData(prev => ({ ...prev, profile_image: updatedUser.profile_image }))
+
+      // Update auth context
+      updateUser(updatedUser)
+
+      // Emit WebSocket event
+      socketService.emitProfileUpdated(user.id, { profile_image: updatedUser.profile_image })
+
+      setSuccess('Profile photo updated!')
+
+      // Force re-fetch user data after a short delay
+      setTimeout(async () => {
+        try {
+          const freshUser = await authAPI.getMe()
+          updateUser(freshUser.data.user)
+        } catch (err) {
+          console.error('Failed to refresh user data:', err)
+        }
+        setSuccess('')
+      }, 1000)
+    } catch (err) {
+      console.error('Profile photo update error:', err)
+      setError('Failed to update profile photo')
+    }
+  }
+
+  const handleSubmit = async (e) => {
     e.preventDefault()
     setLoading(true)
     setError('')
@@ -58,51 +97,47 @@ const EditProfileModal = ({ onClose }) => {
         setLoading(false)
         return
       }
+    }
 
-      if (formData.currentPassword !== user.password) {
-        setError('Current password is incorrect')
-        setLoading(false)
-        return
+    try {
+      const updateData = {
+        name: formData.name,
+        gender: formData.gender,
+        profileImage: formData.profile_image
       }
-    }
 
-    const updateData = {
-      name: formData.name,
-      gender: formData.gender,
-      profileImage: formData.profileImage
-    }
+      if (formData.newPassword) {
+        updateData.newPassword = formData.newPassword
+        updateData.currentPassword = formData.currentPassword
+      }
 
-    if (isAdmin()) {
-      updateData.email = formData.email
-    }
+      const response = await userAPI.updateProfile(updateData)
 
-    if (formData.newPassword) {
-      updateData.password = formData.newPassword
-    }
+      // Update local user state
+      updateUser(response.data.user)
 
-    const result = updateUser(user.id, updateData)
+      // Emit WebSocket event
+      socketService.emitProfileUpdated(user.id, updateData)
 
-    if (result.success) {
-      login(result.user)
       setSuccess('Profile updated successfully!')
       setTimeout(() => {
         onClose()
       }, 1500)
-    } else {
-      setError(result.message)
+    } catch (err) {
+      setError(err.response?.data?.message || 'Failed to update profile')
+    } finally {
+      setLoading(false)
     }
-
-    setLoading(false)
   }
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-      <div className="bg-white rounded-lg shadow-xl max-w-2xl w-full p-6 max-h-[90vh] overflow-y-auto">
+      <div className="bg-white dark:bg-gray-800 rounded-lg shadow-xl max-w-2xl w-full p-6 max-h-[90vh] overflow-y-auto">
         <div className="flex justify-between items-center mb-6">
-          <h2 className="text-2xl font-semibold text-gray-800">Edit Profile</h2>
+          <h2 className="text-2xl font-semibold text-gray-800 dark:text-white">{t('editProfile')}</h2>
           <button
             onClick={onClose}
-            className="text-gray-400 hover:text-gray-600"
+            className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300"
           >
             <MdClose className="w-6 h-6" />
           </button>
@@ -110,27 +145,27 @@ const EditProfileModal = ({ onClose }) => {
 
         <form onSubmit={handleSubmit} className="space-y-6">
           {error && (
-            <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded">
+            <div className="bg-red-50 dark:bg-red-900/30 border border-red-200 dark:border-red-800 text-red-700 dark:text-red-400 px-4 py-3 rounded">
               {error}
             </div>
           )}
 
           {success && (
-            <div className="bg-green-50 border border-green-200 text-green-700 px-4 py-3 rounded">
+            <div className="bg-green-50 dark:bg-green-900/30 border border-green-200 dark:border-green-800 text-green-700 dark:text-green-400 px-4 py-3 rounded">
               {success}
             </div>
           )}
 
           <div className="flex flex-col items-center">
             <div className="relative">
-              {formData.profileImage ? (
+              {formData.profile_image ? (
                 <img
-                  src={formData.profileImage}
+                  src={formData.profile_image}
                   alt="Profile"
-                  className="w-32 h-32 rounded-full object-cover border-4 border-blue-100"
+                  className="w-32 h-32 rounded-full object-cover border-4 border-blue-100 dark:border-blue-900"
                 />
               ) : (
-                <div className="w-32 h-32 rounded-full bg-blue-600 flex items-center justify-center text-white text-4xl font-medium border-4 border-blue-100">
+                <div className="w-32 h-32 rounded-full bg-blue-600 flex items-center justify-center text-white text-4xl font-medium border-4 border-blue-100 dark:border-blue-900">
                   {formData.name?.charAt(0).toUpperCase()}
                 </div>
               )}
@@ -144,13 +179,13 @@ const EditProfileModal = ({ onClose }) => {
                 />
               </label>
             </div>
-            <p className="text-xs text-gray-500 mt-2">Click camera icon to upload image (max 2MB)</p>
+            <p className="text-xs text-gray-500 dark:text-gray-400 mt-2">Click camera icon to upload image (max 2MB)</p>
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Full Name
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                {t('name')}
               </label>
               <input
                 type="text"
@@ -158,51 +193,49 @@ const EditProfileModal = ({ onClose }) => {
                 value={formData.name}
                 onChange={handleChange}
                 required
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none"
+                className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none"
               />
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Gender
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                {t('gender')}
               </label>
               <select
                 name="gender"
                 value={formData.gender}
                 onChange={handleChange}
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none"
+                className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none"
               >
                 <option value="Not specified">Not specified</option>
-                <option value="Male">Male</option>
-                <option value="Female">Female</option>
-                <option value="Other">Other</option>
+                <option value="Male">{t('male')}</option>
+                <option value="Female">{t('female')}</option>
+                <option value="Other">{t('other')}</option>
               </select>
             </div>
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              Email Address {!isAdmin() && <span className="text-xs text-gray-500">(Cannot be changed)</span>}
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+              {t('email')} {!isAdmin() && <span className="text-xs text-gray-500 dark:text-gray-400">(Cannot be changed)</span>}
             </label>
             <input
               type="email"
               name="email"
               value={formData.email}
               onChange={handleChange}
-              disabled={!isAdmin()}
+              disabled={true}
               required
-              className={`w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none ${
-                !isAdmin() ? 'bg-gray-100 cursor-not-allowed' : ''
-              }`}
+              className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none bg-gray-100 dark:bg-gray-600 cursor-not-allowed"
             />
           </div>
 
-          <div className="border-t pt-4">
-            <h3 className="text-lg font-medium text-gray-800 mb-4">Change Password (Optional)</h3>
+          <div className="border-t dark:border-gray-700 pt-4">
+            <h3 className="text-lg font-medium text-gray-800 dark:text-white mb-4">{t('changePassword')} (Optional)</h3>
 
             <div className="space-y-4">
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                   Current Password
                 </label>
                 <input
@@ -210,14 +243,14 @@ const EditProfileModal = ({ onClose }) => {
                   name="currentPassword"
                   value={formData.currentPassword}
                   onChange={handleChange}
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none"
+                  className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none"
                   placeholder="Enter current password"
                 />
               </div>
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                     New Password
                   </label>
                   <input
@@ -225,13 +258,13 @@ const EditProfileModal = ({ onClose }) => {
                     name="newPassword"
                     value={formData.newPassword}
                     onChange={handleChange}
-                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none"
+                    className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none"
                     placeholder="New password"
                   />
                 </div>
 
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                     Confirm Password
                   </label>
                   <input
@@ -239,7 +272,7 @@ const EditProfileModal = ({ onClose }) => {
                     name="confirmPassword"
                     value={formData.confirmPassword}
                     onChange={handleChange}
-                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none"
+                    className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none"
                     placeholder="Confirm password"
                   />
                 </div>
@@ -251,16 +284,16 @@ const EditProfileModal = ({ onClose }) => {
             <button
               type="button"
               onClick={onClose}
-              className="flex-1 px-4 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 transition"
+              className="flex-1 px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 transition"
             >
-              Cancel
+              {t('cancel')}
             </button>
             <button
               type="submit"
               disabled={loading}
               className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition disabled:opacity-50 disabled:cursor-not-allowed"
             >
-              {loading ? 'Saving...' : 'Save Changes'}
+              {loading ? 'Saving...' : t('save')}
             </button>
           </div>
         </form>
