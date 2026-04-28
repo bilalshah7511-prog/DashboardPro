@@ -19,18 +19,29 @@ dotenv.config()
 const app = express()
 const httpServer = createServer(app)
 
+// Allowed origins for CORS
+const allowedOrigins = [
+  'http://localhost:5173',
+  'http://localhost:3000',
+  'http://blogpanel-web.vercel.app',
+  'https://blogpanel-web.vercel.app',
+  process.env.FRONTEND_URL
+].filter(Boolean)
+
 // Socket.IO setup
 const io = new Server(httpServer, {
   cors: {
-    origin: '*',
-    methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH'],
+    origin: allowedOrigins,
+    methods: ['GET', 'POST'],
+    credentials: true
   }
 })
 
 // Middleware
 app.use(helmet())
 app.use(cors({
-  origin: '*',
+  origin: allowedOrigins,
+  credentials: true
 }))
 app.use(express.json({ limit: '10mb' }))
 app.use(express.urlencoded({ extended: true, limit: '10mb' }))
