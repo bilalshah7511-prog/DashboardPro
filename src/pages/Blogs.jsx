@@ -3,10 +3,11 @@ import { useAuth } from '../context/AuthContext'
 import { useNavigate } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import { blogAPI } from '../services/api'
-import { MdAdd, MdEdit, MdDelete, MdImage, MdSearch } from 'react-icons/md'
-import CreateBlogModal from '../components/CreateBlogModal'
-import EditBlogModal from '../components/EditBlogModal'
-import { BlogCardSkeletonGrid, EmptyState } from '../components/skeletons'
+import { MdAdd, MdEdit, MdDelete, MdImage, MdSearch, MdFavorite, MdChat, MdVisibility } from 'react-icons/md'
+import CreateBlogModal from '../components/organisms/CreateBlogModal'
+import EditBlogModal from '../components/organisms/EditBlogModal'
+import { BlogCardSkeletonGrid, EmptyState } from '../skeletons'
+import ConfirmModal from '../components/molecules/ConfirmModal'
 
 const Blogs = () => {
   const { user } = useAuth()
@@ -20,6 +21,14 @@ const Blogs = () => {
   const [showEditModal, setShowEditModal] = useState(false)
   const [editingBlog, setEditingBlog] = useState(null)
   const [searchQuery, setSearchQuery] = useState('')
+  const [myBlogsFilter, setMyBlogsFilter] = useState('all')
+  const [confirmModal, setConfirmModal] = useState({
+    isOpen: false,
+    title: '',
+    message: '',
+    onConfirm: null,
+    type: 'danger'
+  })
 
   useEffect(() => {
     fetchBlogs()
@@ -30,27 +39,55 @@ const Blogs = () => {
       setLoading(true)
       if (activeTab === 'all') {
         const response = await blogAPI.getAllBlogs()
-        setAllBlogs(response.data.blogs)
+        console.log('📊 All blogs response:', response.data)
+        setAllBlogs(response.data.blogs || [])
       } else {
         const response = await blogAPI.getMyBlogs()
-        setMyBlogs(response.data.blogs)
+        console.log('📊 My blogs response:', response.data)
+        setMyBlogs(response.data.blogs || [])
       }
     } catch (error) {
-      console.error('Failed to fetch blogs:', error)
+      console.error('❌ Failed to fetch blogs:', error)
+      console.error('Error details:', error.response?.data)
     } finally {
       setLoading(false)
     }
   }
 
-  const handleDelete = async (id) => {
-    if (window.confirm('Are you sure you want to delete this blog?')) {
-      try {
-        await blogAPI.deleteBlog(id)
-        fetchBlogs()
-      } catch (error) {
-        alert(error.response?.data?.message || 'Failed to delete blog')
-      }
-    }
+  const handleDelete = (id) => {
+    setConfirmModal({
+      isOpen: true,
+      message: t('confirmDeleteBlog'),
+      onConfirm: async () => {
+        try {
+          await blogAPI.deleteBlog(id)
+          setConfirmModal(prev => ({ ...prev, isOpen: false }))
+          fetchBlogs()
+        } catch (error) {
+          console.error('Failed to delete blog:', error)
+          alert(error.response?.data?.message || 'Failed to delete blog')
+        }
+      },
+      type: 'danger'
+    })
+  }
+
+  const handleUnpublish = (id) => {
+    setConfirmModal({
+      isOpen: true,
+      message: t('confirmUnpublish'),
+      onConfirm: async () => {
+        try {
+          await blogAPI.unpublishBlog(id)
+          setConfirmModal(prev => ({ ...prev, isOpen: false }))
+          fetchBlogs()
+        } catch (error) {
+          console.error('Failed to unpublish blog:', error)
+          alert(error.response?.data?.message || 'Failed to unpublish blog')
+        }
+      },
+      type: 'warning'
+    })
   }
 
   const handleEdit = (blog) => {
@@ -62,7 +99,8 @@ const Blogs = () => {
     const badges = {
       pending: 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-300',
       approved: 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-300',
-      rejected: 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-300'
+      rejected: 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-300',
+      unpublished: 'bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-300'
     }
     return badges[status] || badges.pending
   }
@@ -70,11 +108,19 @@ const Blogs = () => {
   const blogs = activeTab === 'all' ? allBlogs : myBlogs
 
   const filteredBlogs = blogs.filter(blog => {
+    // Search filter
     const query = searchQuery.toLowerCase()
     const titleMatch = blog.title?.toLowerCase().includes(query)
     const authorMatch = blog.author_name?.toLowerCase().includes(query)
     const tagMatch = blog.tags?.some(tag => tag.toLowerCase().includes(query))
-    return titleMatch || authorMatch || tagMatch
+    const matchesSearch = titleMatch || authorMatch || tagMatch
+    
+    // Status filter for My Blogs
+    if (activeTab === 'my' && myBlogsFilter !== 'all') {
+      return matchesSearch && blog.status === myBlogsFilter
+    }
+    
+    return matchesSearch
   })
 
   return (
@@ -93,47 +139,70 @@ const Blogs = () => {
         </button>
       </div>
 
-      {/* Tabs - Always visible */}
-      <div className="bg-white dark:bg-gray-800 rounded-lg shadow mb-6">
-        <div className="flex border-b border-gray-200 dark:border-gray-700">
-          <button
-            onClick={() => setActiveTab('all')}
-            disabled={loading}
-            className={`px-6 py-3 font-medium transition disabled:opacity-50 ${
-              activeTab === 'all'
-                ? 'text-blue-600 dark:text-blue-400 border-b-2 border-blue-600 dark:border-blue-400'
-                : 'text-gray-600 dark:text-gray-400 hover:text-gray-800 dark:hover:text-gray-200'
-            }`}
-          >
-            {t('allBlogs')}
-          </button>
-          <button
-            onClick={() => setActiveTab('my')}
-            disabled={loading}
-            className={`px-6 py-3 font-medium transition disabled:opacity-50 ${
-              activeTab === 'my'
-                ? 'text-blue-600 dark:text-blue-400 border-b-2 border-blue-600 dark:border-blue-400'
-                : 'text-gray-600 dark:text-gray-400 hover:text-gray-800 dark:hover:text-gray-200'
-            }`}
-          >
-            {t('myBlogs')}
-          </button>
+      {/* Tabs with Search on Right */}
+      <div className="bg-white dark:bg-gray-800 rounded-lg shadow mb-4">
+        <div className="flex items-center justify-between border-b border-gray-200 dark:border-gray-700">
+          {/* Main Tabs */}
+          <div className="flex">
+            <button
+              onClick={() => { setActiveTab('all'); setMyBlogsFilter('all'); }}
+              disabled={loading}
+              className={`px-6 py-3 font-medium transition disabled:opacity-50 ${
+                activeTab === 'all'
+                  ? 'text-blue-600 dark:text-blue-400 border-b-2 border-blue-600 dark:border-blue-400'
+                  : 'text-gray-600 dark:text-gray-400 hover:text-gray-800 dark:hover:text-gray-200'
+              }`}
+            >
+              {t('allBlogs')}
+            </button>
+            <button
+              onClick={() => setActiveTab('my')}
+              disabled={loading}
+              className={`px-6 py-3 font-medium transition disabled:opacity-50 ${
+                activeTab === 'my'
+                  ? 'text-blue-600 dark:text-blue-400 border-b-2 border-blue-600 dark:border-blue-400'
+                  : 'text-gray-600 dark:text-gray-400 hover:text-gray-800 dark:hover:text-gray-200'
+              }`}
+            >
+              {t('myBlogs')}
+            </button>
+          </div>
+          {/* Search - Right Side */}
+          <div className="px-4 py-2">
+            <div className="relative">
+              <MdSearch className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
+              <input
+                type="text"
+                placeholder={t('search')}
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                disabled={loading}
+                className="w-48 lg:w-64 pl-9 pr-3 py-1.5 text-sm border border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none disabled:opacity-50"
+              />
+            </div>
+          </div>
         </div>
-      </div>
 
-      {/* Search Bar */}
-      <div className="bg-white dark:bg-gray-800 rounded-lg shadow mb-6 p-4">
-        <div className="relative">
-          <MdSearch className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
-          <input
-            type="text"
-            placeholder={t('search')}
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            disabled={loading}
-            className="w-full pl-10 pr-4 py-2 border border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none disabled:opacity-50"
-          />
-        </div>
+        {/* Status Filter Tabs - Only for My Blogs */}
+        {activeTab === 'my' && (
+          <div className="flex items-center gap-2 px-4 py-3 bg-gray-50 dark:bg-gray-700/50 border-t border-gray-100 dark:border-gray-700">
+            <span className="text-sm text-gray-500 dark:text-gray-400 mr-2">{t('filter')}:</span>
+            {['all', 'approved', 'unpublished', 'rejected', 'pending'].map((status) => (
+              <button
+                key={status}
+                onClick={() => setMyBlogsFilter(status)}
+                disabled={loading}
+                className={`px-3 py-1 text-xs font-medium rounded-full transition disabled:opacity-50 ${
+                  myBlogsFilter === status
+                    ? 'bg-blue-600 text-white'
+                    : 'bg-gray-200 dark:bg-gray-600 text-gray-700 dark:text-gray-300 hover:bg-gray-300 dark:hover:bg-gray-500'
+                }`}
+              >
+                {t(status)}
+              </button>
+            ))}
+          </div>
+        )}
       </div>
 
       {/* Loading Skeleton */}
@@ -142,9 +211,9 @@ const Blogs = () => {
       {/* Empty State */}
       {!loading && filteredBlogs.length === 0 && (
         <EmptyState 
-          icon="search"
-          title={searchQuery ? t('noData') : activeTab === 'all' ? t('noData') : t('noData')}
-          description={t('noData')}
+          icon="folder"
+          title={searchQuery ? t('noSearchResults') : activeTab === 'all' ? t('No Blogs Yet') : t('No My Blogs Yet')}
+          description={searchQuery ? t('tryDifferentSearch') : activeTab === 'all' ? t('beFirstToCreate') : t('Create Your First Blog')}
           action={activeTab === 'my' ? { label: t('createBlog'), onClick: () => setShowCreateModal(true) } : null}
         />
       )}
@@ -197,6 +266,22 @@ const Blogs = () => {
                   </div>
                 )}
 
+                {/* Stats - Likes, Comments, Views */}
+                <div className="flex items-center gap-4 text-sm text-gray-500 dark:text-gray-400 mb-4">
+                  <span className="flex items-center gap-1">
+                    <MdFavorite className="w-4 h-4" />
+                    {blog.likes_count || 0}
+                  </span>
+                  <span className="flex items-center gap-1">
+                    <MdChat className="w-4 h-4" />
+                    {blog.comments_count || 0}
+                  </span>
+                  <span className="flex items-center gap-1">
+                    <MdVisibility className="w-4 h-4" />
+                    {blog.views || 0}
+                  </span>
+                </div>
+
                 {/* Author Info */}
                 <div className="flex items-center justify-between pt-4 border-t border-gray-200 dark:border-gray-700">
                   <div className="flex items-center space-x-2">
@@ -217,7 +302,20 @@ const Blogs = () => {
 
                   {/* Actions (only for own blogs) */}
                   {activeTab === 'my' && (
-                    <div className="flex space-x-2">
+                    <div className="flex items-center space-x-2">
+                      {blog.status === 'approved' && (
+                        <button
+                          onClick={() => handleUnpublish(blog.id)}
+                          className="px-3 py-1.5 text-xs font-medium text-orange-600 dark:text-orange-400 bg-orange-50 dark:bg-orange-900/30 hover:bg-orange-100 dark:hover:bg-orange-900/50 rounded-lg transition"
+                        >
+                          {t('unpublish')}
+                        </button>
+                      )}
+                      {blog.status === 'unpublished' && (
+                        <span className="px-3 py-1.5 text-xs font-medium text-gray-500 dark:text-gray-400 bg-gray-100 dark:bg-gray-800 rounded-lg">
+                          {t('unpublished')}
+                        </span>
+                      )}
                       <button
                         onClick={() => handleEdit(blog)}
                         className="p-2 text-blue-600 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-900/30 rounded transition"
@@ -264,6 +362,18 @@ const Blogs = () => {
           }}
         />
       )}
+
+      {/* Confirm Modal */}
+      <ConfirmModal
+        isOpen={confirmModal.isOpen}
+        title={confirmModal.title}
+        message={confirmModal.message}
+        onConfirm={confirmModal.onConfirm}
+        onCancel={() => setConfirmModal(prev => ({ ...prev, isOpen: false }))}
+        confirmText={t('yes')}
+        cancelText={t('cancel')}
+        type={confirmModal.type}
+      />
     </div>
   )
 }

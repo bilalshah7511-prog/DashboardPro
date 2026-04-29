@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { authAPI } from '../services/api'
-import socketService from '../services/socket'
+import { authAPI } from '../../services/api'
+import socketService from '../../services/socket'
 import { MdClose, MdCameraAlt } from 'react-icons/md'
 
 const AddUserModal = ({ onClose, onUserAdded }) => {

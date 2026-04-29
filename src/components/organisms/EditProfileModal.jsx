@@ -1,8 +1,8 @@
 import { useState } from 'react'
-import { useAuth } from '../context/AuthContext'
+import { useAuth } from '../../context/AuthContext'
 import { useTranslation } from 'react-i18next'
-import { userAPI, authAPI } from '../services/api'
-import socketService from '../services/socket'
+import { userAPI, authAPI } from '../../services/api'
+import socketService from '../../services/socket'
 import { MdClose, MdCameraAlt } from 'react-icons/md'
 
 const EditProfileModal = ({ onClose }) => {

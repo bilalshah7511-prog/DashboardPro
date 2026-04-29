@@ -3,7 +3,7 @@ import { useAuth } from '../context/AuthContext'
 import { useTheme } from '../context/ThemeContext'
 import { useTranslation } from 'react-i18next'
 import { userAPI } from '../services/api'
-import { EmptyState } from '../components/skeletons'
+import { EmptyState } from '../skeletons'
 import { LineChart, Line, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts'
 
 const Analytics = () => {
@@ -81,7 +81,7 @@ const Analytics = () => {
       {/* Empty State */}
       {!loading && loginRecords.length === 0 && (
         <EmptyState 
-          icon="inbox"
+          icon="folder"
           title={t('noData')}
           description={t('noData')}
         />

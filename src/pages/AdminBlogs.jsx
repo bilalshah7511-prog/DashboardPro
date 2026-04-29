@@ -4,7 +4,9 @@ import { useTranslation } from 'react-i18next'
 import { blogAPI } from '../services/api'
 import { MdCheck, MdClose, MdDelete, MdImage, MdFilterList } from 'react-icons/md'
 import { FaSpinner } from 'react-icons/fa'
-import { EmptyState } from '../components/skeletons'
+import { EmptyState } from '../skeletons'
+import ConfirmModal from '../components/molecules/ConfirmModal'
+import { AddUserModal, EditUserModal } from '../components'
 
 const AdminBlogs = () => {
   const navigate = useNavigate()
@@ -13,6 +15,13 @@ const AdminBlogs = () => {
   const [loading, setLoading] = useState(true)
   const [filterStatus, setFilterStatus] = useState('all')
   const [actionLoading, setActionLoading] = useState({}) // Track loading state for each blog action
+  const [confirmModal, setConfirmModal] = useState({
+    isOpen: false,
+    title: '',
+    message: '',
+    onConfirm: null,
+    type: 'danger'
+  })
 
   // Keep track of current request to prevent race conditions
   const currentFilterRef = useRef(filterStatus)
@@ -73,39 +82,78 @@ const AdminBlogs = () => {
     }
   }
 
-  const handleReject = async (id) => {
-    if (window.confirm(t('confirmReject'))) {
-      setActionLoading({ ...actionLoading, [`reject-${id}`]: true })
-      try {
-        await blogAPI.rejectBlog(id)
-        fetchBlogs()
-      } catch (error) {
-        alert(error.response?.data?.message || t('error'))
-      } finally {
-        setActionLoading({ ...actionLoading, [`reject-${id}`]: false })
-      }
-    }
+  const handleReject = (id) => {
+    setConfirmModal({
+      isOpen: true,
+      message: t('confirmReject'),
+      onConfirm: async () => {
+        setActionLoading({ ...actionLoading, [`reject-${id}`]: true })
+        try {
+          await blogAPI.rejectBlog(id)
+          setBlogs(blogs.filter(blog => blog.id !== id))
+          alert(t('blogRejected'))
+        } catch (error) {
+          console.error('Failed to reject blog:', error)
+          alert(error.response?.data?.message || t('failedRejectBlog'))
+        } finally {
+          setActionLoading({ ...actionLoading, [`reject-${id}`]: false })
+          setConfirmModal(prev => ({ ...prev, isOpen: false }))
+        }
+      },
+      type: 'warning'
+    })
   }
 
-  const handleDelete = async (id) => {
-    if (window.confirm(t('confirmDeleteBlog'))) {
-      setActionLoading({ ...actionLoading, [`delete-${id}`]: true })
-      try {
-        await blogAPI.deleteBlog(id)
-        fetchBlogs()
-      } catch (error) {
-        alert(error.response?.data?.message || t('error'))
-      } finally {
-        setActionLoading({ ...actionLoading, [`delete-${id}`]: false })
-      }
-    }
+  const handleDelete = (id) => {
+    setConfirmModal({
+      isOpen: true,
+      message: t('confirmDeleteBlog'),
+      onConfirm: async () => {
+        setActionLoading({ ...actionLoading, [`delete-${id}`]: true })
+        try {
+          await blogAPI.deleteBlog(id)
+          setBlogs(blogs.filter(blog => blog.id !== id))
+          alert(t('blogDeleted'))
+        } catch (error) {
+          console.error('Failed to delete blog:', error)
+          alert(error.response?.data?.message || t('failedDeleteBlog'))
+        } finally {
+          setActionLoading({ ...actionLoading, [`delete-${id}`]: false })
+          setConfirmModal(prev => ({ ...prev, isOpen: false }))
+        }
+      },
+      type: 'danger'
+    })
+  }
+
+  const handleUnpublish = (id) => {
+    setConfirmModal({
+      isOpen: true,
+      message: t('confirmUnpublish'),
+      onConfirm: async () => {
+        setActionLoading({ ...actionLoading, [`unpublish-${id}`]: true })
+        try {
+          await blogAPI.unpublishBlog(id)
+          setBlogs(blogs.filter(blog => blog.id !== id))
+          alert(t('blogUnpublished'))
+        } catch (error) {
+          console.error('Failed to unpublish blog:', error)
+          alert(error.response?.data?.message || t('failedUnpublishBlog'))
+        } finally {
+          setActionLoading({ ...actionLoading, [`unpublish-${id}`]: false })
+          setConfirmModal(prev => ({ ...prev, isOpen: false }))
+        }
+      },
+      type: 'warning'
+    })
   }
 
   const getStatusBadge = (status) => {
     const badges = {
       pending: { bg: 'bg-yellow-100 dark:bg-yellow-900/30', text: 'text-yellow-800 dark:text-yellow-300', label: t('pending') },
       approved: { bg: 'bg-green-100 dark:bg-green-900/30', text: 'text-green-800 dark:text-green-300', label: t('approved') },
-      rejected: { bg: 'bg-red-100 dark:bg-red-900/30', text: 'text-red-800 dark:text-red-300', label: t('rejected') }
+      rejected: { bg: 'bg-red-100 dark:bg-red-900/30', text: 'text-red-800 dark:text-red-300', label: t('rejected') },
+      unpublished: { bg: 'bg-gray-100 dark:bg-gray-900/30', text: 'text-gray-800 dark:text-gray-300', label: t('unpublished') }
     }
     return badges[status] || badges.pending
   }
@@ -114,7 +162,8 @@ const AdminBlogs = () => {
     all: blogs.length,
     pending: blogs.filter(b => b.status === 'pending').length,
     approved: blogs.filter(b => b.status === 'approved').length,
-    rejected: blogs.filter(b => b.status === 'rejected').length
+    rejected: blogs.filter(b => b.status === 'rejected').length,
+    unpublished: blogs.filter(b => b.status === 'unpublished').length
   }
 
   return (
@@ -127,7 +176,7 @@ const AdminBlogs = () => {
       {/* Filter Tabs - Always visible */}
       <div className="bg-white dark:bg-gray-800 rounded-lg shadow mb-6">
         <div className="flex border-b border-gray-200 dark:border-gray-700 overflow-x-auto">
-          {['all', 'pending', 'approved', 'rejected'].map((status) => (
+          {['all', 'pending', 'approved', 'rejected', 'unpublished'].map((status) => (
             <button
               key={status}
               onClick={() => setFilterStatus(status)}
@@ -177,7 +226,7 @@ const AdminBlogs = () => {
       {/* Empty State */}
       {!loading && blogs.length === 0 && (
         <EmptyState 
-          icon="file"
+          icon="folder"
           title={filterStatus === 'all' ? t('noBlogs') : t('noStatusBlogs', { status: t(filterStatus) })}
           description={filterStatus === 'all' ? t('noBlogsDesc') : t('noStatusBlogsDesc', { status: t(filterStatus) })}
         />
@@ -304,6 +353,36 @@ const AdminBlogs = () => {
                           <span className="hidden md:inline">{t('approved')}</span>
                         </button>
                       )}
+                      {blog.status === 'approved' && (
+                        <button
+                          onClick={() => handleUnpublish(blog.id)}
+                          disabled={actionLoading[`unpublish-${blog.id}`]}
+                          className="flex items-center justify-center px-4 py-2 bg-orange-600 text-white rounded-lg hover:bg-orange-700 transition disabled:opacity-50 disabled:cursor-not-allowed"
+                          title={t('unpublish')}
+                        >
+                          {actionLoading[`unpublish-${blog.id}`] ? (
+                            <FaSpinner className="w-5 h-5 animate-spin md:mr-2" />
+                          ) : (
+                            <MdClose className="w-5 h-5 md:mr-2" />
+                          )}
+                          <span className="hidden md:inline">{t('unpublish')}</span>
+                        </button>
+                      )}
+                      {blog.status === 'unpublished' && (
+                        <button
+                          onClick={() => handleApprove(blog.id)}
+                          disabled={actionLoading[`approve-${blog.id}`]}
+                          className="flex items-center justify-center px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition disabled:opacity-50 disabled:cursor-not-allowed"
+                          title={t('publish')}
+                        >
+                          {actionLoading[`approve-${blog.id}`] ? (
+                            <FaSpinner className="w-5 h-5 animate-spin md:mr-2" />
+                          ) : (
+                            <MdCheck className="w-5 h-5 md:mr-2" />
+                          )}
+                          <span className="hidden md:inline">{t('publish')}</span>
+                        </button>
+                      )}
                       <button
                         onClick={() => handleDelete(blog.id)}
                         disabled={actionLoading[`delete-${blog.id}`]}
@@ -325,6 +404,18 @@ const AdminBlogs = () => {
           })}
         </div>
       )}
+
+      {/* Confirm Modal */}
+      <ConfirmModal
+        isOpen={confirmModal.isOpen}
+        title={confirmModal.title}
+        message={confirmModal.message}
+        onConfirm={confirmModal.onConfirm}
+        onCancel={() => setConfirmModal(prev => ({ ...prev, isOpen: false }))}
+        confirmText={t('yes')}
+        cancelText={t('cancel')}
+        type={confirmModal.type}
+      />
     </div>
   )
 }

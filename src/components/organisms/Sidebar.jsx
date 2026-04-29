@@ -1,5 +1,5 @@
 import { Link, useLocation, useNavigate } from 'react-router-dom'
-import { useAuth } from '../context/AuthContext'
+import { useAuth } from '../../context/AuthContext'
 import { useTranslation } from 'react-i18next'
 import { MdDashboard, MdPeople, MdAnalytics, MdLogout, MdPhotoLibrary, MdArticle } from 'react-icons/md'
 

@@ -10,7 +10,7 @@ import Analytics from '../pages/Analytics'
 import Blogs from '../pages/Blogs'
 import BlogDetail from '../pages/BlogDetail'
 import AdminBlogs from '../pages/AdminBlogs'
-import DashboardLayout from '../components/DashboardLayout'
+import DashboardLayout from '../components/organisms/DashboardLayout'
 
 const AppRoutes = () => {
   const { user } = useAuth()

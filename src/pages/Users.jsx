@@ -3,9 +3,9 @@ import { useAuth } from '../context/AuthContext'
 import { useTranslation } from 'react-i18next'
 import { userAPI } from '../services/api'
 import socketService from '../services/socket'
-import EditUserModal from '../components/EditUserModal'
-import AddUserModal from '../components/AddUserModal'
-import { TableSkeleton, EmptyState } from '../components/skeletons'
+import EditUserModal from '../components/organisms/EditUserModal'
+import AddUserModal from '../components/organisms/AddUserModal'
+import { TableSkeleton, EmptyState } from '../skeletons'
 import { FaEdit, FaTrash, FaUserPlus, FaSearch, FaImage } from 'react-icons/fa'
 
 const Users = () => {
@@ -157,7 +157,7 @@ const Users = () => {
         {/* Empty State */}
         {!loading && filteredUsers.length === 0 && (
           <EmptyState 
-            icon="search"
+            icon="folder"
             title="No users found"
             description={searchTerm ? 'No users match your search criteria.' : 'There are no users to display.'}
           />

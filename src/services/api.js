@@ -109,7 +109,23 @@ export const blogAPI = {
   updateBlog: (id, data) => api.put(`/blogs/${id}`, data),
   deleteBlog: (id) => api.delete(`/blogs/${id}`),
   approveBlog: (id) => api.put(`/blogs/${id}/approve`),
-  rejectBlog: (id) => api.put(`/blogs/${id}/reject`)
+  rejectBlog: (id) => api.put(`/blogs/${id}/reject`),
+  unpublishBlog: (id) => api.put(`/blogs/${id}/unpublish`),
+  likeBlog: (id) => api.post(`/blogs/${id}/like`),
+  unlikeBlog: (id) => api.delete(`/blogs/${id}/like`),
+  getBlogLikes: (id) => api.get(`/blogs/${id}/likes`),
+  addComment: (id, content, parentId = null) => api.post(`/blogs/${id}/comments`, { content, parentId }),
+  deleteComment: (id, commentId) => api.delete(`/blogs/${id}/comments/${commentId}`),
+  getBlogComments: (id) => api.get(`/blogs/${id}/comments`),
+  trackBlogView: (id) => api.post(`/blogs/${id}/view`),
+  getLatestBlogs: (limit) => api.get('/blogs/latest', { params: { limit } }),
+
+  // Notifications
+  getNotifications: () => api.get('/notifications'),
+  getUnreadCount: () => api.get('/notifications/unread-count'),
+  markNotificationRead: (id) => api.put(`/notifications/${id}/read`),
+  markAllNotificationsRead: () => api.put('/notifications/mark-all-read'),
+  deleteNotification: (id) => api.delete(`/notifications/${id}`)
 }
 
 export default api

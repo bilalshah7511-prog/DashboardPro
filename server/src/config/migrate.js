@@ -75,7 +75,7 @@ const createTables = async () => {
       console.log('✅ Default admin user created')
     }
 
-    // Create blogs table
+    // Create blogs table (updated with view_count)
     await pool.query(`
       CREATE TABLE IF NOT EXISTS blogs (
         id SERIAL PRIMARY KEY,
@@ -84,13 +84,113 @@ const createTables = async () => {
         description TEXT NOT NULL,
         featured_image TEXT,
         tags TEXT[],
-        status VARCHAR(20) DEFAULT 'pending' CHECK (status IN ('pending', 'approved', 'rejected')),
+        status VARCHAR(20) DEFAULT 'pending' CHECK (status IN ('pending', 'approved', 'rejected', 'unpublished')),
+        view_count INTEGER DEFAULT 0,
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
         updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
         published_at TIMESTAMP
       )
     `)
     console.log('✅ Blogs table created')
+
+    // Add view_count column if it doesn't exist (for existing tables)
+    try {
+      await pool.query(`
+        ALTER TABLE blogs 
+        ADD COLUMN IF NOT EXISTS view_count INTEGER DEFAULT 0
+      `)
+      console.log('✅ view_count column added to blogs')
+    } catch (err) {
+      console.log('ℹ️ view_count column may already exist')
+    }
+
+    // Create blog_likes table
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS blog_likes (
+        id SERIAL PRIMARY KEY,
+        blog_id INTEGER NOT NULL REFERENCES blogs(id) ON DELETE CASCADE,
+        user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        UNIQUE(blog_id, user_id)
+      )
+    `)
+    console.log('✅ Blog likes table created')
+
+    // Create blog_comments table (with parent_id for nested replies)
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS blog_comments (
+        id SERIAL PRIMARY KEY,
+        blog_id INTEGER NOT NULL REFERENCES blogs(id) ON DELETE CASCADE,
+        user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        parent_id INTEGER REFERENCES blog_comments(id) ON DELETE CASCADE,
+        content TEXT NOT NULL,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      )
+    `)
+    console.log('✅ Blog comments table created')
+
+    // Add parent_id column if it doesn't exist (for existing tables)
+    try {
+      await pool.query(`
+        ALTER TABLE blog_comments 
+        ADD COLUMN IF NOT EXISTS parent_id INTEGER REFERENCES blog_comments(id) ON DELETE CASCADE
+      `)
+      console.log('✅ parent_id column added to blog_comments')
+    } catch (err) {
+      console.log('ℹ️ parent_id column may already exist')
+    }
+
+    // Create blog_views table (for unique view tracking)
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS blog_views (
+        id SERIAL PRIMARY KEY,
+        blog_id INTEGER NOT NULL REFERENCES blogs(id) ON DELETE CASCADE,
+        user_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
+        ip_address VARCHAR(50),
+        user_agent TEXT,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        UNIQUE(blog_id, user_id, ip_address)
+      )
+    `)
+    console.log('✅ Blog views table created')
+
+    // Add indexes for better performance
+    await pool.query(`
+      CREATE INDEX IF NOT EXISTS idx_blogs_status ON blogs(status);
+      CREATE INDEX IF NOT EXISTS idx_blogs_user_id ON blogs(user_id);
+      CREATE INDEX IF NOT EXISTS idx_blog_likes_blog_id ON blog_likes(blog_id);
+      CREATE INDEX IF NOT EXISTS idx_blog_comments_blog_id ON blog_comments(blog_id);
+      CREATE INDEX IF NOT EXISTS idx_blog_views_blog_id ON blog_views(blog_id);
+    `)
+    console.log('✅ Blog indexes created')
+
+    // Create notifications table
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS notifications (
+        id SERIAL PRIMARY KEY,
+        user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        type VARCHAR(50) NOT NULL, -- 'like', 'comment', 'reply', 'blog_approved'
+        title VARCHAR(255) NOT NULL,
+        message TEXT NOT NULL,
+        sender_name VARCHAR(255),
+        sender_image TEXT,
+        blog_id INTEGER REFERENCES blogs(id) ON DELETE CASCADE,
+        comment_id INTEGER REFERENCES blog_comments(id) ON DELETE CASCADE,
+        is_read BOOLEAN DEFAULT false,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      )
+    `)
+    console.log('✅ Notifications table created')
+
+    // Add sender columns if not exist (for existing tables)
+    try {
+      await pool.query(`ALTER TABLE notifications ADD COLUMN IF NOT EXISTS sender_name VARCHAR(255)`)
+      await pool.query(`ALTER TABLE notifications ADD COLUMN IF NOT EXISTS sender_image TEXT`)
+      console.log('✅ Sender columns added to notifications')
+    } catch (err) {
+      console.log('ℹ️ Sender columns may already exist')
+    }
 
     console.log('🎉 Database migration completed successfully!')
     process.exit(0)

@@ -117,8 +117,8 @@ export const initializeAdmin = () => {
     addUser({
       email: 'admin@gmail.com',
       password: 'admin',
-      name: 'Admin User',
-      gender: 'Not specified'
+      name: 'Admin',
+      gender: 'Male'
     })
   }
 }

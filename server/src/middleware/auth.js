@@ -51,7 +51,7 @@ export const isAdmin = (req, res, next) => {
 
 export const saveRefreshToken = async (userId, refreshToken) => {
   const expiresAt = new Date()
-  expiresAt.setDate(expiresAt.getDate() + 30)
+  expiresAt.setHours(expiresAt.getHours() + 24) // 24 hours expiry
 
   await pool.query(
     'INSERT INTO sessions (user_id, refresh_token, expires_at) VALUES ($1, $2, $3)',

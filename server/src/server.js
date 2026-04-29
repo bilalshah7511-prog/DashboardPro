@@ -13,6 +13,7 @@ import userRoutes from './routes/userRoutes.js'
 import twoFactorRoutes from './routes/twoFactorRoutes.js'
 import exportRoutes from './routes/exportRoutes.js'
 import blogRoutes from './routes/blogRoutes.js'
+import notificationRoutes from './routes/notificationRoutes.js'
 
 dotenv.config()
 
@@ -68,6 +69,7 @@ app.use('/api/users', userRoutes)
 app.use('/api/2fa', twoFactorRoutes)
 app.use('/api/export', exportRoutes)
 app.use('/api/blogs', blogRoutes)
+app.use('/api/notifications', notificationRoutes)
 
 // Health check
 app.get('/api/health', (req, res) => {

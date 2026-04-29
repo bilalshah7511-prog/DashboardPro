@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react'
 import { MdClose } from 'react-icons/md'
 import { FaSearch, FaFilter, FaClock, FaTimes } from 'react-icons/fa'
 import { useTranslation } from 'react-i18next'
-import { userAPI } from '../services/api'
+import { userAPI } from '../../services/api'
 
 const LoginDetailsModal = ({ onClose }) => {
   const { t } = useTranslation()

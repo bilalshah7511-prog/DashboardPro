@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { userAPI } from '../services/api'
-import socketService from '../services/socket'
+import { userAPI } from '../../services/api'
+import socketService from '../../services/socket'
 import { MdClose } from 'react-icons/md'
 
 const EditUserModal = ({ user, onClose, onSave }) => {

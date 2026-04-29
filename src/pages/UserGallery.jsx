@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react'
 import { useAuth } from '../context/AuthContext'
 import { userAPI } from '../services/api'
 import socketService from '../services/socket'
-import { EmptyState } from '../components/skeletons'
+import { EmptyState } from '../skeletons'
 import { FaMale, FaFemale, FaGenderless, FaCalendarAlt, FaShieldAlt } from 'react-icons/fa'
 
 const UserGallery = () => {
