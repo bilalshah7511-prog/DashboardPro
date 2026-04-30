@@ -8,6 +8,7 @@ import CreateBlogModal from '../components/organisms/CreateBlogModal'
 import EditBlogModal from '../components/organisms/EditBlogModal'
 import { BlogCardSkeletonGrid, EmptyState } from '../skeletons'
 import ConfirmModal from '../components/molecules/ConfirmModal'
+import UserHoverCard from '../components/molecules/UserHoverCard'
 
 const Blogs = () => {
   const { user } = useAuth()
@@ -222,7 +223,7 @@ const Blogs = () => {
       {!loading && filteredBlogs.length > 0 && (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           {filteredBlogs.map((blog) => (
-            <div key={blog.id} className="bg-white dark:bg-gray-800 rounded-lg shadow hover:shadow-xl transition overflow-hidden">
+            <div key={blog.id} className="bg-white dark:bg-gray-800 rounded-lg shadow hover:shadow-xl transition">
               {/* Featured Image */}
               {blog.featured_image ? (
                 <img
@@ -283,7 +284,7 @@ const Blogs = () => {
                 </div>
 
                 {/* Author Info */}
-                <div className="flex items-center justify-between pt-4 border-t border-gray-200 dark:border-gray-700">
+                <div className="flex items-center justify-between pt-4 border-t border-gray-200 dark:border-gray-700 relative z-50">
                   <div className="flex items-center space-x-2">
                     {blog.author_image ? (
                       <img src={blog.author_image} alt={blog.author_name} className="w-8 h-8 rounded-full" />
@@ -293,7 +294,14 @@ const Blogs = () => {
                       </div>
                     )}
                     <div>
-                      <p className="text-sm font-medium text-gray-800 dark:text-white">{blog.author_name}</p>
+                      <UserHoverCard
+                        userId={blog.user_id}
+                        userName={blog.author_name}
+                        userImage={blog.author_image}
+                        placement="top"
+                      >
+                        <p className="text-sm font-medium text-gray-800 dark:text-white hover:text-blue-600 dark:hover:text-blue-400 transition-colors cursor-pointer">{blog.author_name}</p>
+                      </UserHoverCard>
                       <p className="text-xs text-gray-500 dark:text-gray-400">
                         {new Date(blog.created_at).toLocaleDateString()}
                       </p>

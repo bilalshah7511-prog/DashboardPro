@@ -80,7 +80,8 @@ export const userAPI = {
   deleteUser: (id) => api.delete(`/users/${id}`),
   getStats: () => api.get('/users/stats'),
   getLoginRecords: (userId) => userId ? api.get(`/users/${userId}/login-records`) : api.get('/users/login-records'),
-  getAllLoginRecords: () => api.get('/users/login-records/all')
+  getAllLoginRecords: () => api.get('/users/login-records/all'),
+  getUserBlogStats: (id) => api.get(`/users/${id}/blog-stats`)
 }
 
 // 2FA API

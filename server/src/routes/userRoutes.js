@@ -1,5 +1,5 @@
 import express from 'express'
-import { getAllUsers, getUserById, updateProfile, updateUser, deleteUser, getLoginRecords, getUserStats } from '../controllers/userController.js'
+import { getAllUsers, getUserById, updateProfile, updateUser, deleteUser, getLoginRecords, getUserStats, getUserBlogStats } from '../controllers/userController.js'
 import { verifyToken, isAdmin } from '../middleware/auth.js'
 
 const router = express.Router()
@@ -8,6 +8,9 @@ const router = express.Router()
 router.get('/stats', verifyToken, getUserStats)
 router.get('/login-records', verifyToken, getLoginRecords)
 router.put('/profile', verifyToken, updateProfile)
+
+// Public user stats (for hover card - any authenticated user can view)
+router.get('/:id/blog-stats', verifyToken, getUserBlogStats)
 
 // Admin only routes
 router.get('/', verifyToken, isAdmin, getAllUsers)

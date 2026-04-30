@@ -6,6 +6,7 @@ import { useTranslation } from 'react-i18next'
 import { MdArrowBack, MdImage, MdPerson, MdCalendarToday, MdFavorite, MdFavoriteBorder, MdChat, MdVisibility, MdSend, MdDelete, MdArticle } from 'react-icons/md'
 import { FaSpinner } from 'react-icons/fa'
 import ConfirmModal from '../components/molecules/ConfirmModal'
+import UserHoverCard from '../components/molecules/UserHoverCard'
 
 const BlogDetail = () => {
   const { id } = useParams()
@@ -367,7 +368,14 @@ const BlogDetail = () => {
                     </div>
                   )}
                   <div>
-                    <p className="font-medium text-gray-800 dark:text-white">{blog.author_name}</p>
+                    <UserHoverCard
+                      userId={blog.user_id}
+                      userName={blog.author_name}
+                      userImage={blog.author_image}
+                      placement="right"
+                    >
+                      <p className="font-medium text-gray-800 dark:text-white hover:text-blue-600 dark:hover:text-blue-400 transition-colors">{blog.author_name}</p>
+                    </UserHoverCard>
                     <p className="text-sm text-gray-500">{t('author')}</p>
                   </div>
                 </div>
@@ -523,7 +531,14 @@ const BlogDetail = () => {
                       <div className="flex-1 min-w-0">
                         <div className="bg-gray-50 dark:bg-gray-700/50 rounded-2xl px-4 py-2.5">
                           <div className="flex items-center justify-between mb-1">
-                            <p className="font-semibold text-gray-800 dark:text-white text-sm">{comment.author_name}</p>
+                            <UserHoverCard
+                              userId={comment.user_id}
+                              userName={comment.author_name}
+                              userImage={comment.author_image}
+                              placement="right"
+                            >
+                              <p className="font-semibold text-gray-800 dark:text-white text-sm hover:text-blue-600 dark:hover:text-blue-400 transition-colors cursor-pointer">{comment.author_name}</p>
+                            </UserHoverCard>
                             <div className="flex items-center gap-2">
                               <span className="text-xs text-gray-400">
                                 {new Date(comment.created_at).toLocaleDateString()}
@@ -672,7 +687,14 @@ const BlogDetail = () => {
                           {latestBlog.author_name?.charAt(0).toUpperCase()}
                         </div>
                       )}
-                      <span className="text-xs text-gray-600 dark:text-gray-400">{latestBlog.author_name}</span>
+                      <UserHoverCard
+                        userId={latestBlog.user_id}
+                        userName={latestBlog.author_name}
+                        userImage={latestBlog.author_image}
+                        placement="left"
+                      >
+                        <span className="text-xs text-gray-600 dark:text-gray-400 hover:text-blue-600 dark:hover:text-blue-400 transition-colors cursor-pointer">{latestBlog.author_name}</span>
+                      </UserHoverCard>
                     </div>
 
                     {/* Stats */}

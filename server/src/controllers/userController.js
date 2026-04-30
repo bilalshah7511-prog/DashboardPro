@@ -241,6 +241,84 @@ export const getLoginRecords = async (req, res) => {
   }
 }
 
+// Get user blog statistics (for hover card)
+export const getUserBlogStats = async (req, res) => {
+  try {
+    const { id } = req.params
+
+    // Get published blogs count (approved status)
+    const publishedResult = await pool.query(
+      `SELECT COUNT(*) FROM blogs WHERE user_id = $1 AND status = 'approved'`,
+      [id]
+    )
+    const publishedCount = parseInt(publishedResult.rows[0].count)
+
+    // Get rejected blogs count
+    const rejectedResult = await pool.query(
+      `SELECT COUNT(*) FROM blogs WHERE user_id = $1 AND status = 'rejected'`,
+      [id]
+    )
+    const rejectedCount = parseInt(rejectedResult.rows[0].count)
+
+    // Get pending blogs count
+    const pendingResult = await pool.query(
+      `SELECT COUNT(*) FROM blogs WHERE user_id = $1 AND status = 'pending'`,
+      [id]
+    )
+    const pendingCount = parseInt(pendingResult.rows[0].count)
+
+    // Get total likes on user's blogs
+    const likesResult = await pool.query(
+      `SELECT COUNT(*) FROM blog_likes bl
+       JOIN blogs b ON bl.blog_id = b.id
+       WHERE b.user_id = $1`,
+      [id]
+    )
+    const totalLikes = parseInt(likesResult.rows[0].count)
+
+    // Get total views on user's blogs
+    const viewsResult = await pool.query(
+      `SELECT COALESCE(SUM(view_count), 0) as total_views FROM blogs WHERE user_id = $1`,
+      [id]
+    )
+    const totalViews = parseInt(viewsResult.rows[0].total_views)
+
+    // Get total comments on user's blogs
+    const commentsResult = await pool.query(
+      `SELECT COUNT(*) FROM blog_comments c
+       JOIN blogs b ON c.blog_id = b.id
+       WHERE b.user_id = $1`,
+      [id]
+    )
+    const totalComments = parseInt(commentsResult.rows[0].count)
+
+    // Get user basic info
+    const userResult = await pool.query(
+      `SELECT name, email, profile_image, role, created_at FROM users WHERE id = $1`,
+      [id]
+    )
+
+    if (userResult.rows.length === 0) {
+      return res.status(404).json({ message: 'User not found' })
+    }
+
+    res.json({
+      user: userResult.rows[0],
+      stats: {
+        publishedCount,
+        rejectedCount,
+        pendingCount,
+        totalLikes,
+        totalViews,
+        totalComments
+      }
+    })
+  } catch (error) {
+    console.error('Get user blog stats error:', error)
+    res.status(500).json({ message: 'Server error' })
+  }
+}
+
 // Get user statistics
 export const getUserStats = async (req, res) => {
   try {
