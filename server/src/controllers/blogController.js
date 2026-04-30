@@ -106,9 +106,24 @@ export const getAllBlogsAdmin = async (req, res) => {
     const { status } = req.query
 
     let query = `
-      SELECT b.*, u.name as author_name, u.email as author_email, u.profile_image as author_image
+      SELECT 
+        b.id, b.user_id, b.title, b.description, b.featured_image, b.tags,
+        b.status, b.published_at, b.created_at, b.updated_at, b.view_count,
+        u.name as author_name, u.email as author_email, u.profile_image as author_image,
+        COALESCE(l.likes_count, 0) as likes_count,
+        COALESCE(c.comments_count, 0) as comments_count
       FROM blogs b
       JOIN users u ON b.user_id = u.id
+      LEFT JOIN (
+        SELECT blog_id, COUNT(*) as likes_count 
+        FROM blog_likes 
+        GROUP BY blog_id
+      ) l ON b.id = l.blog_id
+      LEFT JOIN (
+        SELECT blog_id, COUNT(*) as comments_count 
+        FROM blog_comments 
+        GROUP BY blog_id
+      ) c ON b.id = c.blog_id
     `
 
     if (status && ['pending', 'approved', 'rejected'].includes(status)) {

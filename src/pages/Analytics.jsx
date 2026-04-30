@@ -1,10 +1,12 @@
 import { useState, useEffect } from 'react'
+import { Link } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
 import { useTheme } from '../context/ThemeContext'
 import { useTranslation } from 'react-i18next'
-import { userAPI } from '../services/api'
+import { userAPI, blogAPI } from '../services/api'
 import { EmptyState } from '../skeletons'
 import { LineChart, Line, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts'
+import { MdFavorite, MdVisibility, MdChat } from 'react-icons/md'
 
 const Analytics = () => {
   const { user, isAdmin } = useAuth()
@@ -12,7 +14,10 @@ const Analytics = () => {
   const { theme } = useTheme()
   const [loginRecords, setLoginRecords] = useState([])
   const [users, setUsers] = useState([])
+  const [blogs, setBlogs] = useState([])
   const [loading, setLoading] = useState(true)
+  const [dateFilter, setDateFilter] = useState({ start: '', end: '' })
+  const [trendingBlog, setTrendingBlog] = useState(null)
 
   const isDark = theme === 'dark'
 
@@ -23,16 +28,22 @@ const Analytics = () => {
   const fetchData = async () => {
     try {
       if (isAdmin()) {
-        const [usersRes, recordsRes] = await Promise.all([
+        const [usersRes, recordsRes, blogsRes] = await Promise.all([
           userAPI.getAll(),
-          userAPI.getLoginRecords()
+          userAPI.getLoginRecords(),
+          blogAPI.getAllBlogsAdmin('all')
         ])
         setUsers(usersRes.data.users)
         setLoginRecords(recordsRes.data.loginRecords)
+        setBlogs(blogsRes.data.blogs || [])
       } else {
         // Regular user - backend will filter by req.user.id automatically
-        const recordsRes = await userAPI.getLoginRecords()
+        const [recordsRes, myBlogsRes] = await Promise.all([
+          userAPI.getLoginRecords(),
+          blogAPI.getMyBlogs()
+        ])
         setLoginRecords(recordsRes.data.loginRecords)
+        setBlogs(myBlogsRes.data.blogs || [])
       }
     } catch (error) {
       console.error('Failed to fetch analytics data:', error)
@@ -44,6 +55,9 @@ const Analytics = () => {
   const dailyData = getDailyLoginData(loginRecords)
   const monthlyData = getMonthlyLoginData(loginRecords)
   const userActivityData = isAdmin() ? getUserActivityData(users, loginRecords) : []
+  const blogMonthlyData = getMonthlyBlogData(blogs, dateFilter)
+  const blogStats = getBlogStats(blogs, dateFilter)
+  const trendingBlogsList = getTrendingBlogs(blogs)
 
   return (
     <div>
@@ -128,6 +142,124 @@ const Analytics = () => {
                 <Bar dataKey="logins" fill="#10B981" />
               </BarChart>
             </ResponsiveContainer>
+          </div>
+
+          {/* Blog Analytics Section */}
+          <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-6">
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="text-xl font-semibold text-gray-800 dark:text-white">
+                {isAdmin() ? t('Blog Analytics Overview') : t('Your Blog Analytics')}
+              </h2>
+              {isAdmin() && (
+                <div className="flex items-center gap-2">
+                  <input
+                    type="date"
+                    value={dateFilter.start}
+                    onChange={(e) => setDateFilter(prev => ({ ...prev, start: e.target.value }))}
+                    className="px-3 py-1.5 text-sm border border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white rounded-lg"
+                    placeholder="Start Date"
+                  />
+                  <span className="text-gray-500">to</span>
+                  <input
+                    type="date"
+                    value={dateFilter.end}
+                    onChange={(e) => setDateFilter(prev => ({ ...prev, end: e.target.value }))}
+                    className="px-3 py-1.5 text-sm border border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white rounded-lg"
+                    placeholder="End Date"
+                  />
+                </div>
+              )}
+            </div>
+
+            {/* Blog Stats Cards */}
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+              <div className="bg-green-50 dark:bg-green-900/20 rounded-lg p-4">
+                <p className="text-sm text-gray-600 dark:text-gray-400">{t('Published Blogs')}</p>
+                <p className="text-2xl font-bold text-green-600 dark:text-green-400">{blogStats.published}</p>
+              </div>
+              <div className="bg-red-50 dark:bg-red-900/20 rounded-lg p-4">
+                <p className="text-sm text-gray-600 dark:text-gray-400">{t('Rejected Blogs')}</p>
+                <p className="text-2xl font-bold text-red-600 dark:text-red-400">{blogStats.rejected}</p>
+              </div>
+              <div className="bg-yellow-50 dark:bg-yellow-900/20 rounded-lg p-4">
+                <p className="text-sm text-gray-600 dark:text-gray-400">{t('Pending Blogs')}</p>
+                <p className="text-2xl font-bold text-yellow-600 dark:text-yellow-400">{blogStats.pending}</p>
+              </div>
+              <div className="bg-blue-50 dark:bg-blue-900/20 rounded-lg p-4">
+                <p className="text-sm text-gray-600 dark:text-gray-400">{t('Total Views')}</p>
+                <p className="text-2xl font-bold text-blue-600 dark:text-blue-400">{blogStats.totalViews}</p>
+              </div>
+            </div>
+
+            {/* Monthly Blog Creation Chart */}
+            {blogMonthlyData.length > 0 && (
+              <div className="mb-6">
+                <h3 className="text-lg font-medium text-gray-800 dark:text-white mb-3">{t('Monthly Blog Creation')}</h3>
+                <ResponsiveContainer width="100%" height={250}>
+                  <BarChart data={blogMonthlyData}>
+                    <CartesianGrid strokeDasharray="3 3" stroke={isDark ? '#374151' : '#e5e7eb'} />
+                    <XAxis dataKey="month" stroke={isDark ? '#9ca3af' : '#6b7280'} />
+                    <YAxis stroke={isDark ? '#9ca3af' : '#6b7280'} />
+                    <Tooltip
+                      contentStyle={{
+                        backgroundColor: isDark ? '#1f2937' : '#ffffff',
+                        border: `1px solid ${isDark ? '#374151' : '#e5e7eb'}`,
+                        color: isDark ? '#f3f4f6' : '#111827'
+                      }}
+                    />
+                    <Legend wrapperStyle={{ color: isDark ? '#f3f4f6' : '#111827' }} />
+                    <Bar dataKey="published" fill="#10B981" name={t('published')} />
+                    <Bar dataKey="rejected" fill="#EF4444" name={t('rejected')} />
+                    <Bar dataKey="pending" fill="#F59E0B" name={t('pending')} />
+                  </BarChart>
+                </ResponsiveContainer>
+              </div>
+            )}
+
+            {/* Trending Blogs */}
+            {trendingBlogsList.length > 0 && (
+              <div>
+                <h3 className="text-lg font-medium text-gray-800 dark:text-white mb-3">{t('Trending Blogs')}</h3>
+                <div className="space-y-3">
+                  {trendingBlogsList.slice(0, 5).map((blog, index) => (
+                    <div key={blog.id} className="flex items-center justify-between p-3 bg-gray-50 dark:bg-gray-700/50 rounded-lg">
+                      <div className="flex items-center gap-3">
+                        <span className="flex items-center justify-center w-6 h-6 bg-blue-600 text-white text-xs font-bold rounded-full">
+                          {index + 1}
+                        </span>
+                        {blog.author_image ? (
+                          <img src={blog.author_image} alt={blog.author_name} className="w-8 h-8 rounded-full object-cover" />
+                        ) : (
+                          <div className="w-8 h-8 rounded-full bg-blue-600 flex items-center justify-center text-white text-sm font-medium">
+                            {blog.author_name?.charAt(0).toUpperCase()}
+                          </div>
+                        )}
+                        <div>
+                          <Link to={`/blogs/${blog.id}`} className="font-medium text-gray-800 dark:text-white text-sm hover:text-blue-600 dark:hover:text-blue-400 transition-colors">
+                            {blog.title}
+                          </Link>
+                          <p className="text-xs text-gray-500 dark:text-gray-400">{blog.author_name}</p>
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-3 text-sm">
+                        <span className="flex items-center gap-1 text-pink-600">
+                          <MdFavorite className="w-4 h-4" />
+                          {blog.likes_count || 0}
+                        </span>
+                        <span className="flex items-center gap-1 text-blue-600">
+                          <MdVisibility className="w-4 h-4" />
+                          {blog.view_count || 0}
+                        </span>
+                        <span className="flex items-center gap-1 text-purple-600">
+                          <MdChat className="w-4 h-4" />
+                          {blog.comments_count || 0}
+                        </span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
           </div>
 
           {isAdmin() && userActivityData.length > 0 && (
@@ -253,6 +385,58 @@ const getUserActivityData = (users, records) => {
         logins: userLogins.length
       }
     }).filter(data => data.logins > 0)
+}
+
+const getMonthlyBlogData = (blogs, dateFilter) => {
+  const monthlyMap = {}
+  
+  blogs.forEach(blog => {
+    const date = new Date(blog.created_at)
+    
+    // Apply date filter if set
+    if (dateFilter.start && date < new Date(dateFilter.start)) return
+    if (dateFilter.end && date > new Date(dateFilter.end)) return
+    
+    const month = date.toLocaleString('default', { month: 'short', year: 'numeric' })
+    
+    if (!monthlyMap[month]) {
+      monthlyMap[month] = { published: 0, rejected: 0, pending: 0 }
+    }
+    
+    if (blog.status === 'approved') monthlyMap[month].published++
+    else if (blog.status === 'rejected') monthlyMap[month].rejected++
+    else if (blog.status === 'pending') monthlyMap[month].pending++
+  })
+  
+  return Object.entries(monthlyMap)
+    .map(([month, counts]) => ({ month, ...counts }))
+    .slice(-6)
+}
+
+const getBlogStats = (blogs, dateFilter) => {
+  const filtered = blogs.filter(blog => {
+    const date = new Date(blog.created_at)
+    if (dateFilter.start && date < new Date(dateFilter.start)) return false
+    if (dateFilter.end && date > new Date(dateFilter.end)) return false
+    return true
+  })
+  
+  return {
+    published: filtered.filter(b => b.status === 'approved').length,
+    rejected: filtered.filter(b => b.status === 'rejected').length,
+    pending: filtered.filter(b => b.status === 'pending').length,
+    totalViews: filtered.reduce((sum, b) => sum + (b.view_count || 0), 0)
+  }
+}
+
+const getTrendingBlogs = (blogs) => {
+  return blogs
+    .filter(b => b.status === 'approved')
+    .sort((a, b) => {
+      const scoreA = (a.view_count || 0) + (a.likes_count || 0) * 2 + (a.comments_count || 0) * 3
+      const scoreB = (b.view_count || 0) + (b.likes_count || 0) * 2 + (b.comments_count || 0) * 3
+      return scoreB - scoreA
+    })
 }
 
 export default Analytics
