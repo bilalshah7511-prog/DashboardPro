@@ -72,7 +72,7 @@ const UserHoverCard = ({ userId, userName, userImage, children, placement = 'bot
   const getPositionClasses = () => {
     switch (placement) {
       case 'top':
-        return 'bottom-full mb-3 left-1/2 -translate-x-1/2'
+        return 'bottom-full mb-2 left-1/2 -translate-x-1/3'
       case 'right':
         return 'left-full ml-2 top-1/2 -translate-y-1/2'
       case 'left':
@@ -86,7 +86,7 @@ const UserHoverCard = ({ userId, userName, userImage, children, placement = 'bot
   const getArrowClasses = () => {
     switch (placement) {
       case 'top':
-        return 'top-full left-1/2 -translate-x-1/2 -mt-1 border-l-8 border-r-8 border-t-8 border-l-transparent border-r-transparent border-t-white dark:border-t-gray-800'
+        return 'top-full left-1/3 -translate-x-1/2 -mt-1 border-l-8 border-r-8 border-t-8 border-l-transparent border-r-transparent border-t-white dark:border-t-gray-800'
       case 'right':
         return 'right-full top-1/2 -translate-y-1/2 -ml-1 border-t-8 border-b-8 border-r-8 border-t-transparent border-b-transparent border-r-white dark:border-r-gray-800'
       case 'left':
