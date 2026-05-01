@@ -1,7 +1,7 @@
 import { Link, useLocation, useNavigate } from 'react-router-dom'
 import { useAuth } from '../../context/AuthContext'
 import { useTranslation } from 'react-i18next'
-import { MdDashboard, MdPeople, MdAnalytics, MdLogout, MdPhotoLibrary, MdArticle } from 'react-icons/md'
+import { MdDashboard, MdPeople, MdAnalytics, MdLogout, MdPhotoLibrary, MdArticle, MdChat } from 'react-icons/md'
 
 const Sidebar = ({ sidebarOpen, setSidebarOpen }) => {
   const location = useLocation()
@@ -17,7 +17,8 @@ const Sidebar = ({ sidebarOpen, setSidebarOpen }) => {
       { name: t('blogManagement'), path: '/admin/blogs', icon: MdArticle }
     ] : []),
     { name: t('blogs'), path: '/blogs', icon: MdArticle },
-    { name: t('analytics'), path: '/analytics', icon: MdAnalytics }
+    { name: t('analytics'), path: '/analytics', icon: MdAnalytics },
+    { name: t('chat'), path: '/chat', icon: MdChat }
   ]
 
   const handleLogout = async () => {

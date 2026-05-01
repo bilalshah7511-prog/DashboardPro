@@ -74,6 +74,7 @@ export const authAPI = {
 // User API
 export const userAPI = {
   getAll: () => api.get('/users'),
+  getAvailable: () => api.get('/users/available'),
   getById: (id) => api.get(`/users/${id}`),
   updateProfile: (data) => api.put('/users/profile', data),
   updateUser: (id, data) => api.put(`/users/${id}`, data),
@@ -127,6 +128,45 @@ export const blogAPI = {
   markNotificationRead: (id) => api.put(`/notifications/${id}/read`),
   markAllNotificationsRead: () => api.put('/notifications/mark-all-read'),
   deleteNotification: (id) => api.delete(`/notifications/${id}`)
+}
+
+// Chat API
+export const chatAPI = {
+  // Friends
+  sendFriendRequest: (friendId) => api.post('/chat/friends/request', { friendId }),
+  acceptFriendRequest: (requestId) => api.put(`/chat/friends/request/${requestId}/accept`),
+  rejectFriendRequest: (requestId) => api.put(`/chat/friends/request/${requestId}/reject`),
+  getFriends: () => api.get('/chat/friends'),
+  getPendingRequests: () => api.get('/chat/friends/pending'),
+  removeFriend: (friendId) => api.delete(`/chat/friends/${friendId}`),
+
+  // Block
+  blockUser: (blockedId) => api.post('/chat/block', { blockedId }),
+  unblockUser: (blockedId) => api.delete(`/chat/block/${blockedId}`),
+  getBlockedUsers: () => api.get('/chat/blocked'),
+
+  // Messages
+  sendMessage: (receiverId, content, imageUrl) => api.post('/chat/messages', { receiverId, content, imageUrl }),
+  getConversation: (friendId) => api.get(`/chat/messages/conversation/${friendId}`),
+  getRecentConversations: () => api.get('/chat/messages/recent'),
+  deleteMessage: (messageId) => api.delete(`/chat/messages/${messageId}`),
+  deleteMessageForEveryone: (messageId) => api.delete(`/chat/messages/${messageId}/everyone`),
+  getMessageInfo: (messageId) => api.get(`/chat/messages/${messageId}/info`),
+  getUnreadCount: () => api.get('/chat/messages/unread-count'),
+
+  // Follow
+  followUser: (followingId) => api.post('/chat/follow', { followingId }),
+  unfollowUser: (followingId) => api.delete(`/chat/follow/${followingId}`),
+  getFollowers: (userId) => api.get(`/chat/followers/${userId}`),
+  getFollowing: (userId) => api.get(`/chat/following/${userId}`),
+
+  // Stats
+  getUserFriendStats: (userId) => api.get(`/chat/stats/${userId}`),
+
+  // Admin
+  getAllMessages: () => api.get('/chat/admin/messages'),
+  getAdminConversation: (userId1, userId2) => api.get(`/chat/admin/conversation/${userId1}/${userId2}`),
+  getAllUserConversations: () => api.get('/chat/admin/conversations')
 }
 
 export default api

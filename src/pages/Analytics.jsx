@@ -16,6 +16,7 @@ const Analytics = () => {
   const [users, setUsers] = useState([])
   const [blogs, setBlogs] = useState([])
   const [loading, setLoading] = useState(true)
+  const [error, setError] = useState(null)
   const [dateFilter, setDateFilter] = useState({ start: '', end: '' })
   const [trendingBlog, setTrendingBlog] = useState(null)
 
@@ -27,46 +28,72 @@ const Analytics = () => {
 
   const fetchData = async () => {
     try {
+      setLoading(true)
+      setError(null)
       if (isAdmin()) {
         const [usersRes, recordsRes, blogsRes] = await Promise.all([
           userAPI.getAll(),
           userAPI.getLoginRecords(),
           blogAPI.getAllBlogsAdmin('all')
         ])
-        setUsers(usersRes.data.users)
-        setLoginRecords(recordsRes.data.loginRecords)
-        setBlogs(blogsRes.data.blogs || [])
+        setUsers(usersRes.data?.users || [])
+        setLoginRecords(recordsRes.data?.loginRecords || [])
+        setBlogs(blogsRes.data?.blogs || [])
       } else {
         // Regular user - backend will filter by req.user.id automatically
         const [recordsRes, myBlogsRes] = await Promise.all([
           userAPI.getLoginRecords(),
           blogAPI.getMyBlogs()
         ])
-        setLoginRecords(recordsRes.data.loginRecords)
-        setBlogs(myBlogsRes.data.blogs || [])
+        setLoginRecords(recordsRes.data?.loginRecords || [])
+        setBlogs(myBlogsRes.data?.blogs || [])
       }
     } catch (error) {
       console.error('Failed to fetch analytics data:', error)
+      setError(error.message || 'Failed to load analytics data')
     } finally {
       setLoading(false)
     }
   }
 
-  const dailyData = getDailyLoginData(loginRecords)
-  const monthlyData = getMonthlyLoginData(loginRecords)
-  const userActivityData = isAdmin() ? getUserActivityData(users, loginRecords) : []
-  const blogMonthlyData = getMonthlyBlogData(blogs, dateFilter)
-  const blogStats = getBlogStats(blogs, dateFilter)
-  const trendingBlogsList = getTrendingBlogs(blogs)
+  // Safely compute data with fallback to empty arrays
+  const dailyData = loginRecords?.length ? getDailyLoginData(loginRecords) : []
+  const monthlyData = loginRecords?.length ? getMonthlyLoginData(loginRecords) : []
+  const userActivityData = isAdmin() && users?.length ? getUserActivityData(users, loginRecords) : []
+  const blogMonthlyData = blogs?.length ? getMonthlyBlogData(blogs, dateFilter) : []
+  const blogStats = blogs?.length ? getBlogStats(blogs, dateFilter) : { published: 0, rejected: 0, pending: 0, totalViews: 0 }
+  const trendingBlogsList = blogs?.length ? getTrendingBlogs(blogs) : []
 
   return (
     <div>
+      {/* Tabs Header */}
       <div className="mb-6">
         <h1 className="text-3xl font-bold text-gray-800 dark:text-white">{t('analytics')}</h1>
         <p className="text-gray-600 dark:text-gray-400 mt-1">
           {isAdmin() ? t('allUserActivity') : t('yourLoginActivity')}
         </p>
       </div>
+
+      {/* Error State */}
+      {error && (
+        <div className={`rounded-lg shadow p-6 mb-6 ${isDark ? 'bg-red-900/20 border border-red-800' : 'bg-red-50 border border-red-200'}`}>
+          <div className="flex items-center gap-3">
+            <svg className="w-6 h-6 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+            </svg>
+            <div>
+              <h3 className={`font-semibold ${isDark ? 'text-red-400' : 'text-red-800'}`}>Error Loading Data</h3>
+              <p className={`text-sm ${isDark ? 'text-red-300' : 'text-red-600'}`}>{error}</p>
+            </div>
+          </div>
+          <button
+            onClick={fetchData}
+            className="mt-4 px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 text-sm"
+          >
+            Try Again
+          </button>
+        </div>
+      )}
 
       {/* Loading Skeleton */}
       {loading && (
@@ -93,11 +120,11 @@ const Analytics = () => {
       )}
 
       {/* Empty State */}
-      {!loading && loginRecords.length === 0 && (
+      {!loading && !error && loginRecords.length === 0 && (
         <EmptyState 
           icon="folder"
-          title={t('noData')}
-          description={t('noData')}
+          title={t('noData') || 'No Data Available'}
+          description={t('noAnalyticsDataYet') || 'No analytics data available yet. Start using the application to generate data.'}
         />
       )}
 
@@ -350,9 +377,11 @@ const Analytics = () => {
 }
 
 const getDailyLoginData = (records) => {
+  if (!Array.isArray(records) || records.length === 0) return []
   const dailyMap = {}
 
   records.forEach(record => {
+    if (!record?.login_time) return
     const date = new Date(record.login_time).toLocaleDateString()
     dailyMap[date] = (dailyMap[date] || 0) + 1
   })
@@ -363,11 +392,13 @@ const getDailyLoginData = (records) => {
 }
 
 const getMonthlyLoginData = (records) => {
+  if (!Array.isArray(records) || records.length === 0) return []
   const monthlyMap = {}
 
   records.forEach(record => {
+    if (!record?.login_time) return
     const date = new Date(record.login_time)
-    const month = date.toLocaleString('default', { month: 'short', year: 'numeric' })
+    const month = date.toLocaleString('default', { month: 'short', year: '2-digit' })
     monthlyMap[month] = (monthlyMap[month] || 0) + 1
   })
 
@@ -377,28 +408,32 @@ const getMonthlyLoginData = (records) => {
 }
 
 const getUserActivityData = (users, records) => {
-  return users
-    .map(user => {
-      const userLogins = records.filter(r => r.userId === user.id)
-      return {
-        name: user.name,
-        logins: userLogins.length
-      }
-    }).filter(data => data.logins > 0)
+  if (!Array.isArray(users) || !Array.isArray(records)) return []
+  const userLogins = {}
+  
+  records.forEach(record => {
+    if (!record?.user_id) return
+    const userId = record.user_id
+    userLogins[userId] = (userLogins[userId] || 0) + 1
+  })
+
+  return users.map(user => ({
+    name: user.name?.split(' ')[0] || 'Unknown',
+    logins: userLogins[user.id] || 0
+  })).slice(0, 10)
 }
 
 const getMonthlyBlogData = (blogs, dateFilter) => {
+  if (!Array.isArray(blogs)) return []
   const monthlyMap = {}
   
   blogs.forEach(blog => {
+    if (!blog?.created_at) return
     const date = new Date(blog.created_at)
+    if (dateFilter?.start && date < new Date(dateFilter.start)) return
+    if (dateFilter?.end && date > new Date(dateFilter.end)) return
     
-    // Apply date filter if set
-    if (dateFilter.start && date < new Date(dateFilter.start)) return
-    if (dateFilter.end && date > new Date(dateFilter.end)) return
-    
-    const month = date.toLocaleString('default', { month: 'short', year: 'numeric' })
-    
+    const month = date.toLocaleString('default', { month: 'short', year: '2-digit' })
     if (!monthlyMap[month]) {
       monthlyMap[month] = { published: 0, rejected: 0, pending: 0 }
     }
@@ -414,10 +449,12 @@ const getMonthlyBlogData = (blogs, dateFilter) => {
 }
 
 const getBlogStats = (blogs, dateFilter) => {
+  if (!Array.isArray(blogs)) return { published: 0, rejected: 0, pending: 0, totalViews: 0 }
   const filtered = blogs.filter(blog => {
+    if (!blog?.created_at) return false
     const date = new Date(blog.created_at)
-    if (dateFilter.start && date < new Date(dateFilter.start)) return false
-    if (dateFilter.end && date > new Date(dateFilter.end)) return false
+    if (dateFilter?.start && date < new Date(dateFilter.start)) return false
+    if (dateFilter?.end && date > new Date(dateFilter.end)) return false
     return true
   })
   
@@ -430,11 +467,12 @@ const getBlogStats = (blogs, dateFilter) => {
 }
 
 const getTrendingBlogs = (blogs) => {
+  if (!Array.isArray(blogs)) return []
   return blogs
-    .filter(b => b.status === 'approved')
+    .filter(b => b?.status === 'approved')
     .sort((a, b) => {
-      const scoreA = (a.view_count || 0) + (a.likes_count || 0) * 2 + (a.comments_count || 0) * 3
-      const scoreB = (b.view_count || 0) + (b.likes_count || 0) * 2 + (b.comments_count || 0) * 3
+      const scoreA = (a?.view_count || 0) + (a?.likes_count || 0) * 2 + (a?.comments_count || 0) * 3
+      const scoreB = (b?.view_count || 0) + (b?.likes_count || 0) * 2 + (b?.comments_count || 0) * 3
       return scoreB - scoreA
     })
 }

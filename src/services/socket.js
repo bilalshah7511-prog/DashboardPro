@@ -125,6 +125,14 @@ class SocketService {
     }
   }
 
+  // Listen for new messages (chat)
+  onNewMessage(callback) {
+    if (this.socket) {
+      this.socket.on('new_message', callback)
+      this.listeners.set('new_message', callback)
+    }
+  }
+
   // Remove listeners
   off(event) {
     if (this.socket && this.listeners.has(event)) {

@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
 import { userAPI } from '../../services/api'
-import { MdFavorite, MdVisibility, MdChat, MdArticle, MdCancel, MdPendingActions } from 'react-icons/md'
+import { MdFavorite, MdVisibility, MdChat, MdArticle, MdCancel, MdPendingActions, MdPeople, MdPersonAdd, MdPerson } from 'react-icons/md'
 import { FaSpinner } from 'react-icons/fa'
 
 const UserHoverCard = ({ userId, userName, userImage, children, placement = 'bottom' }) => {
@@ -220,6 +220,39 @@ const UserHoverCard = ({ userId, userName, userImage, children, placement = 'bot
                     </div>
                     <p className="text-xl font-bold text-purple-700 dark:text-purple-400">
                       {stats.stats.totalComments}
+                    </p>
+                  </div>
+
+                  {/* Friends */}
+                  <div className="bg-indigo-50 dark:bg-indigo-900/20 rounded-lg p-3">
+                    <div className="flex items-center gap-2 mb-1">
+                      <MdPeople className="text-indigo-600 dark:text-indigo-400 text-lg" />
+                      <span className="text-xs text-gray-600 dark:text-gray-400">Friends</span>
+                    </div>
+                    <p className="text-xl font-bold text-indigo-700 dark:text-indigo-400">
+                      {stats.friendStats?.friendsCount || 0}
+                    </p>
+                  </div>
+
+                  {/* Followers */}
+                  <div className="bg-cyan-50 dark:bg-cyan-900/20 rounded-lg p-3">
+                    <div className="flex items-center gap-2 mb-1">
+                      <MdPersonAdd className="text-cyan-600 dark:text-cyan-400 text-lg" />
+                      <span className="text-xs text-gray-600 dark:text-gray-400">Followers</span>
+                    </div>
+                    <p className="text-xl font-bold text-cyan-700 dark:text-cyan-400">
+                      {stats.friendStats?.followersCount || 0}
+                    </p>
+                  </div>
+
+                  {/* Following */}
+                  <div className="bg-teal-50 dark:bg-teal-900/20 rounded-lg p-3">
+                    <div className="flex items-center gap-2 mb-1">
+                      <MdPerson className="text-teal-600 dark:text-teal-400 text-lg" />
+                      <span className="text-xs text-gray-600 dark:text-gray-400">Following</span>
+                    </div>
+                    <p className="text-xl font-bold text-teal-700 dark:text-teal-400">
+                      {stats.friendStats?.followingCount || 0}
                     </p>
                   </div>
                 </div>

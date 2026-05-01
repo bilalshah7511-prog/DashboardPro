@@ -7,8 +7,9 @@ import { HiMenu } from 'react-icons/hi'
 import { FaUser, FaEnvelope, FaShieldAlt, FaEdit, FaChevronDown, FaMoon, FaSun, FaGlobe, FaBell, FaCheck, FaTrash } from 'react-icons/fa'
 import { ReplyIcon } from '../atoms'
 import { EmptyState, NotificationSkeleton } from '../../skeletons'
-import api, { blogAPI } from '../../services/api'
+import api, { blogAPI, chatAPI } from '../../services/api'
 import socketService from '../../services/socket'
+import { MdChat, MdMarkEmailRead, MdMessage, MdPerson, MdDelete as MdDeleteIcon } from 'react-icons/md'
 
 const Navbar = ({ setSidebarOpen, onEditProfile }) => {
   const { user } = useAuth()
@@ -25,6 +26,14 @@ const Navbar = ({ setSidebarOpen, onEditProfile }) => {
   const [showAllNotifModal, setShowAllNotifModal] = useState(false)
   const [visibleCount, setVisibleCount] = useState(10)
   const allNotifScrollRef = useRef(null)
+
+  // Message notifications state
+  const [showMessages, setShowMessages] = useState(false)
+  const [messageConversations, setMessageConversations] = useState([])
+  const [unreadMessageCount, setUnreadMessageCount] = useState(0)
+  const [loadingMessages, setLoadingMessages] = useState(false)
+  const messagesRef = useRef(null)
+  const [activeChatUser, setActiveChatUser] = useState(null)
 
   // Filter notifications based on active tab
   const filteredNotifications = notifications.filter(n => {
@@ -43,6 +52,63 @@ const Navbar = ({ setSidebarOpen, onEditProfile }) => {
   const dropdownRef = useRef(null)
   const langMenuRef = useRef(null)
   const notificationRef = useRef(null)
+
+  // Fetch message conversations
+  const fetchMessageConversations = async () => {
+    if (!user) return
+    setLoadingMessages(true)
+    try {
+      const [conversationsRes, unreadRes] = await Promise.all([
+        chatAPI.getRecentConversations(),
+        chatAPI.getUnreadCount()
+      ])
+      setMessageConversations(conversationsRes.data.conversations || [])
+      setUnreadMessageCount(unreadRes.data.unreadCount || 0)
+    } catch (error) {
+      console.error('❌ Failed to fetch message conversations:', error)
+    } finally {
+      setLoadingMessages(false)
+    }
+  }
+
+  // Mark messages as read for a conversation
+  const handleMarkMessagesRead = async (friendId) => {
+    try {
+      // Fetch conversation to mark as read
+      await chatAPI.getConversation(friendId)
+      setUnreadMessageCount(prev => Math.max(0, prev - 1))
+      setMessageConversations(prev =>
+        prev.map(conv =>
+          conv.other_user_id === friendId ? { ...conv, unread_count: 0 } : conv
+        )
+      )
+    } catch (error) {
+      console.error('Failed to mark messages read:', error)
+    }
+  }
+
+  // Handle message notification click
+  const handleMessageClick = (conv) => {
+    if (conv.unread_count > 0) {
+      handleMarkMessagesRead(conv.other_user_id)
+    }
+    setShowMessages(false)
+    navigate('/chat', { state: { selectedUserId: conv.other_user_id } })
+  }
+
+  // Format time ago for messages
+  const formatMessageTime = (timestamp) => {
+    if (!timestamp) return ''
+    const date = new Date(timestamp)
+    const now = new Date()
+    const diff = Math.floor((now - date) / 1000)
+
+    if (diff < 60) return t('justNow') || 'Just now'
+    if (diff < 3600) return `${Math.floor(diff / 60)}m`
+    if (diff < 86400) return `${Math.floor(diff / 3600)}h`
+    if (diff < 604800) return `${Math.floor(diff / 86400)}d`
+    return date.toLocaleDateString()
+  }
 
   // Fetch notifications
   const fetchNotifications = async () => {
@@ -110,7 +176,7 @@ const Navbar = ({ setSidebarOpen, onEditProfile }) => {
     }
   }
 
-  // Handle notification click - mark as read and navigate to blog
+  // Handle notification click - mark as read and navigate
   const handleNotificationClick = async (notif) => {
     console.log('👆 Notification clicked:', notif.id)
     if (!notif.is_read) {
@@ -120,6 +186,12 @@ const Navbar = ({ setSidebarOpen, onEditProfile }) => {
     setShowNotifications(false)
     if (notif.blog_id) {
       navigate(`/blogs/${notif.blog_id}`)
+    } else if (notif.type === 'friend_request') {
+      // Navigate to chat friends tab for friend requests
+      navigate('/chat', { state: { activeTab: 'friends' } })
+    } else if (notif.type === 'friend_accepted') {
+      // Navigate to chat page when friend request is accepted
+      navigate('/chat')
     }
   }
 
@@ -134,6 +206,9 @@ const Navbar = ({ setSidebarOpen, onEditProfile }) => {
       if (notificationRef.current && !notificationRef.current.contains(event.target)) {
         setShowNotifications(false)
       }
+      if (messagesRef.current && !messagesRef.current.contains(event.target)) {
+        setShowMessages(false)
+      }
     }
 
     document.addEventListener('mousedown', handleClickOutside)
@@ -143,7 +218,11 @@ const Navbar = ({ setSidebarOpen, onEditProfile }) => {
   // Fetch notifications on mount and every 30 seconds
   useEffect(() => {
     fetchNotifications()
-    const interval = setInterval(fetchNotifications, 30000)
+    fetchMessageConversations()
+    const interval = setInterval(() => {
+      fetchNotifications()
+      fetchMessageConversations()
+    }, 30000)
     return () => clearInterval(interval)
   }, [user])
 
@@ -172,6 +251,24 @@ const Navbar = ({ setSidebarOpen, onEditProfile }) => {
       }
     })
 
+    // Listen for new messages via socket
+    socketService.onNewMessage((messageData) => {
+      console.log('💬 New message received:', messageData)
+      // Only increment if not currently viewing that chat
+      if (activeChatUser !== messageData.sender_id) {
+        setUnreadMessageCount(prev => prev + 1)
+        fetchMessageConversations()
+
+        // Show browser notification for message if permitted
+        if ('Notification' in window && Notification.permission === 'granted') {
+          new Notification(`${messageData.sender_name || 'New Message'}`, {
+            body: messageData.content || 'Sent you a message',
+            icon: messageData.sender_image || '/logo.png'
+          })
+        }
+      }
+    })
+
     // Request browser notification permission
     if ('Notification' in window && Notification.permission === 'default') {
       Notification.requestPermission()
@@ -181,7 +278,7 @@ const Navbar = ({ setSidebarOpen, onEditProfile }) => {
       socketService.removeAllListeners()
       socketService.disconnect()
     }
-  }, [user])
+  }, [user, activeChatUser])
 
   const changeLanguage = (lng) => {
     i18n.changeLanguage(lng)
@@ -195,7 +292,9 @@ const Navbar = ({ setSidebarOpen, onEditProfile }) => {
       comment: '💬',
       reply: '↩️',
       blog_approved: '✅',
-      blog_rejected: '❌'
+      blog_rejected: '❌',
+      friend_request: '👋',
+      friend_accepted: '🤝'
     }
     return icons[type] || '📢'
   }
@@ -278,6 +377,126 @@ const Navbar = ({ setSidebarOpen, onEditProfile }) => {
             <FaMoon className="w-5 h-5 text-gray-600" />
           )}
         </button>
+
+        {/* Messages */}
+        <div className="relative" ref={messagesRef}>
+          <button
+            onClick={() => {
+              setShowMessages(!showMessages)
+              if (!showMessages) fetchMessageConversations()
+            }}
+            className="p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 transition relative"
+            title={t('messages') || 'Messages'}
+          >
+            <MdChat className="w-5 h-5 text-gray-600 dark:text-gray-300" />
+            {unreadMessageCount > 0 && (
+              <span className="absolute -top-1 -right-1 bg-green-500 text-white text-xs font-bold rounded-full w-5 h-5 flex items-center justify-center">
+                {unreadMessageCount > 9 ? '9+' : unreadMessageCount}
+              </span>
+            )}
+          </button>
+
+          {showMessages && (
+            <div className="absolute right-0 mt-2 w-80 bg-white dark:bg-gray-800 rounded-lg shadow-xl border border-gray-200 dark:border-gray-700 z-50 max-h-[450px] overflow-hidden flex flex-col">
+              {/* Header */}
+              <div className="px-4 py-3 border-b border-gray-200 dark:border-gray-700 flex items-center justify-between">
+                <h3 className="font-bold text-lg text-gray-800 dark:text-white">{t('messages') || 'Messages'}</h3>
+                {unreadMessageCount > 0 && (
+                  <button
+                    onClick={() => navigate('/chat')}
+                    className="text-xs text-green-600 hover:text-green-700 font-medium"
+                  >
+                    {t('viewAll')}
+                  </button>
+                )}
+              </div>
+
+              {/* Message List */}
+              <div className="overflow-y-auto flex-1 max-h-80">
+                {loadingMessages ? (
+                  <div className="flex items-center justify-center py-8">
+                    <div className="w-6 h-6 border-2 border-green-600 border-t-transparent rounded-full animate-spin" />
+                  </div>
+                ) : messageConversations.length === 0 ? (
+                  <div className="px-4 py-8 text-center">
+                    <MdChat className="w-12 h-12 text-gray-300 dark:text-gray-600 mx-auto mb-3" />
+                    <p className="text-gray-500 dark:text-gray-400 text-sm">{t('noMessages') || 'No messages yet'}</p>
+                    <button
+                      onClick={() => {
+                        setShowMessages(false)
+                        navigate('/chat')
+                      }}
+                      className="mt-3 text-green-600 hover:text-green-700 text-sm font-medium"
+                    >
+                      {t('startChat') || 'Start Chat'}
+                    </button>
+                  </div>
+                ) : (
+                  messageConversations.map((conv) => (
+                    <div
+                      key={conv.other_user_id}
+                      onClick={() => handleMessageClick(conv)}
+                      className={`px-4 py-3 border-b border-gray-100 dark:border-gray-700 cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-700 transition ${
+                        conv.unread_count > 0 ? 'bg-green-50/50 dark:bg-green-900/10' : ''
+                      }`}
+                    >
+                      <div className="flex items-start gap-3">
+                        {/* Avatar */}
+                        {conv.other_user_image ? (
+                          <img
+                            src={conv.other_user_image}
+                            alt={conv.other_user_name}
+                            className="w-10 h-10 rounded-full object-cover flex-shrink-0"
+                          />
+                        ) : (
+                          <div className="w-10 h-10 rounded-full bg-green-100 dark:bg-green-900 flex items-center justify-center flex-shrink-0">
+                            <MdPerson className="w-5 h-5 text-green-600 dark:text-green-400" />
+                          </div>
+                        )}
+
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center justify-between gap-2">
+                            <p className={`font-semibold text-sm truncate ${conv.unread_count > 0 ? 'text-gray-900 dark:text-white' : 'text-gray-700 dark:text-gray-300'}`}>
+                              {conv.other_user_name}
+                            </p>
+                            <span className="text-xs text-gray-400 whitespace-nowrap">
+                              {formatMessageTime(conv.last_message_time)}
+                            </span>
+                          </div>
+                          {conv.last_message && (
+                            <p className={`text-sm truncate mt-0.5 ${conv.unread_count > 0 ? 'text-gray-800 dark:text-gray-200 font-medium' : 'text-gray-500 dark:text-gray-400'}`}>
+                              {conv.last_message}
+                            </p>
+                          )}
+                          {conv.unread_count > 0 && (
+                            <div className="flex items-center gap-2 mt-1">
+                              <span className="px-2 py-0.5 bg-green-500 text-white text-xs rounded-full">
+                                {conv.unread_count} {t('new') || 'new'}
+                              </span>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  ))
+                )}
+              </div>
+
+              {/* Footer */}
+              <div className="px-4 py-3 border-t border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-700/50">
+                <button
+                  onClick={() => {
+                    setShowMessages(false)
+                    navigate('/chat')
+                  }}
+                  className="w-full py-2 text-center text-green-600 dark:text-green-400 font-medium text-sm hover:bg-green-50 dark:hover:bg-green-900/30 rounded-lg transition"
+                >
+                  {t('openChat') || 'Open Chat'}
+                </button>
+              </div>
+            </div>
+          )}
+        </div>
 
         {/* Notifications */}
         <div className="relative" ref={notificationRef}>

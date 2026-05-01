@@ -7,6 +7,7 @@ import Dashboard from '../pages/Dashboard'
 import Users from '../pages/Users'
 import UserGallery from '../pages/UserGallery'
 import Analytics from '../pages/Analytics'
+import Chat from '../pages/Chat'
 import Blogs from '../pages/Blogs'
 import BlogDetail from '../pages/BlogDetail'
 import AdminBlogs from '../pages/AdminBlogs'
@@ -29,6 +30,7 @@ const AppRoutes = () => {
         <Route path="blogs/:id" element={<BlogDetail />} />
         <Route path="admin/blogs" element={<ProtectedRoute adminOnly><AdminBlogs /></ProtectedRoute>} />
         <Route path="analytics" element={<Analytics />} />
+        <Route path="chat" element={<Chat />} />
       </Route>
 
       <Route path="*" element={<Navigate to="/dashboard" replace />} />
