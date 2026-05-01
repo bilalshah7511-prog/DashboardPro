@@ -1,10 +1,11 @@
 import express from 'express'
-import { getAllUsers, getUserById, updateProfile, updateUser, deleteUser, getLoginRecords, getUserStats, getUserBlogStats } from '../controllers/userController.js'
+import { getAllUsers, getAvailableUsers, getUserById, updateProfile, updateUser, deleteUser, getLoginRecords, getUserStats, getUserBlogStats } from '../controllers/userController.js'
 import { verifyToken, isAdmin } from '../middleware/auth.js'
 
 const router = express.Router()
 
-// Protected routes
+// Protected routes (any authenticated user)
+router.get('/available', verifyToken, getAvailableUsers)
 router.get('/stats', verifyToken, getUserStats)
 router.get('/login-records', verifyToken, getLoginRecords)
 router.put('/profile', verifyToken, updateProfile)

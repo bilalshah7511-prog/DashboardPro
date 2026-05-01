@@ -14,6 +14,7 @@ import twoFactorRoutes from './routes/twoFactorRoutes.js'
 import exportRoutes from './routes/exportRoutes.js'
 import blogRoutes from './routes/blogRoutes.js'
 import notificationRoutes from './routes/notificationRoutes.js'
+import chatRoutes from './routes/chatRoutes.js'
 
 dotenv.config()
 
@@ -70,6 +71,7 @@ app.use('/api/2fa', twoFactorRoutes)
 app.use('/api/export', exportRoutes)
 app.use('/api/blogs', blogRoutes)
 app.use('/api/notifications', notificationRoutes)
+app.use('/api/chat', chatRoutes)
 
 // Health check
 app.get('/api/health', (req, res) => {
@@ -80,10 +82,16 @@ app.get('/api/health', (req, res) => {
 io.on('connection', (socket) => {
   console.log('✅ Client connected:', socket.id)
 
+  // Track userId for this socket connection
+  let connectedUserId = null
+
   // Join user-specific room
   socket.on('join', (userId) => {
     socket.join(`user_${userId}`)
+    connectedUserId = userId
     console.log(`User ${userId} joined their room`)
+    // Broadcast online status to all users (they can filter by their friends)
+    io.emit('user_online', { userId })
   })
 
   // Broadcast new user registration
@@ -125,8 +133,35 @@ io.on('connection', (socket) => {
     io.emit('user_list_updated')
   })
 
+  // Chat events
+  socket.on('send_message', (data) => {
+    // Emit to receiver's room
+    io.to(`user_${data.receiverId}`).emit('new_message', data)
+    // Also emit to sender's room for sync across devices
+    io.to(`user_${data.senderId}`).emit('new_message', data)
+  })
+
+  socket.on('friend_request_sent', (data) => {
+    io.to(`user_${data.receiverId}`).emit('new_friend_request', data)
+  })
+
+  socket.on('friend_request_accepted', (data) => {
+    io.to(`user_${data.senderId}`).emit('friend_request_accepted', data)
+  })
+
+  socket.on('typing', (data) => {
+    io.to(`user_${data.receiverId}`).emit('typing', {
+      senderId: data.senderId,
+      isTyping: data.isTyping
+    })
+  })
+
   socket.on('disconnect', () => {
     console.log('❌ Client disconnected:', socket.id)
+    // Broadcast offline status if user was connected
+    if (connectedUserId) {
+      io.emit('user_offline', { userId: connectedUserId })
+    }
   })
 })
 

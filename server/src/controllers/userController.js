@@ -23,6 +23,48 @@ export const getAllUsers = async (req, res) => {
   }
 }
 
+// Get available users for adding friends (any authenticated user)
+export const getAvailableUsers = async (req, res) => {
+  try {
+    const userId = req.user.id
+
+    // Get all users except current user
+    const result = await pool.query(`
+      SELECT u.id, u.name, u.profile_image, u.gender, u.created_at
+      FROM users u
+      WHERE u.id != $1
+      ORDER BY u.name ASC
+    `, [userId])
+
+    // Get existing friends and pending requests
+    const friendsResult = await pool.query(`
+      SELECT friend_id as id FROM friends WHERE user_id = $1
+      UNION
+      SELECT user_id as id FROM friends WHERE friend_id = $1
+    `, [userId])
+
+    // Get blocked users
+    const blockedResult = await pool.query(`
+      SELECT blocked_id as id FROM blocks WHERE blocker_id = $1
+      UNION
+      SELECT blocker_id as id FROM blocks WHERE blocked_id = $1
+    `, [userId])
+
+    const friendIds = new Set(friendsResult.rows.map(r => r.id))
+    const blockedIds = new Set(blockedResult.rows.map(r => r.id))
+
+    // Filter out friends and blocked users
+    const availableUsers = result.rows.filter(u =>
+      !friendIds.has(u.id) && !blockedIds.has(u.id)
+    )
+
+    res.json({ users: availableUsers })
+  } catch (error) {
+    console.error('Get available users error:', error)
+    res.status(500).json({ message: 'Server error' })
+  }
+}
+
 // Get user by ID
 export const getUserById = async (req, res) => {
   try {
@@ -302,6 +344,22 @@ export const getUserBlogStats = async (req, res) => {
       return res.status(404).json({ message: 'User not found' })
     }
 
+    // Get friend stats
+    const friendsResult = await pool.query(
+      `SELECT COUNT(*) FROM friends WHERE (user_id = $1 OR friend_id = $1) AND status = 'accepted'`,
+      [id]
+    )
+
+    const followersResult = await pool.query(
+      'SELECT COUNT(*) FROM following WHERE following_id = $1',
+      [id]
+    )
+
+    const followingResult = await pool.query(
+      'SELECT COUNT(*) FROM following WHERE follower_id = $1',
+      [id]
+    )
+
     res.json({
       user: userResult.rows[0],
       stats: {
@@ -311,6 +369,11 @@ export const getUserBlogStats = async (req, res) => {
         totalLikes,
         totalViews,
         totalComments
+      },
+      friendStats: {
+        friendsCount: parseInt(friendsResult.rows[0].count),
+        followersCount: parseInt(followersResult.rows[0].count),
+        followingCount: parseInt(followingResult.rows[0].count)
       }
     })
   } catch (error) {

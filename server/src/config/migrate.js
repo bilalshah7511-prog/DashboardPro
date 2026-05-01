@@ -192,6 +192,85 @@ const createTables = async () => {
       console.log('ℹ️ Sender columns may already exist')
     }
 
+    // Create friends table
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS friends (
+        id SERIAL PRIMARY KEY,
+        user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        friend_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        status VARCHAR(20) DEFAULT 'pending' CHECK (status IN ('pending', 'accepted', 'rejected')),
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        UNIQUE(user_id, friend_id)
+      )
+    `)
+    console.log('✅ Friends table created')
+
+    // Create messages table
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS messages (
+        id SERIAL PRIMARY KEY,
+        sender_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        receiver_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        content TEXT,
+        image_url TEXT,
+        is_read BOOLEAN DEFAULT false,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      )
+    `)
+    console.log('✅ Messages table created')
+
+    // Create blocks table
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS blocks (
+        id SERIAL PRIMARY KEY,
+        blocker_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        blocked_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        UNIQUE(blocker_id, blocked_id)
+      )
+    `)
+    console.log('✅ Blocks table created')
+
+    // Create following table
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS following (
+        id SERIAL PRIMARY KEY,
+        follower_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        following_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        UNIQUE(follower_id, following_id)
+      )
+    `)
+    console.log('✅ Following table created')
+
+    // Add indexes for chat tables
+    await pool.query(`
+      CREATE INDEX IF NOT EXISTS idx_friends_user_id ON friends(user_id);
+      CREATE INDEX IF NOT EXISTS idx_friends_friend_id ON friends(friend_id);
+      CREATE INDEX IF NOT EXISTS idx_friends_status ON friends(status);
+      CREATE INDEX IF NOT EXISTS idx_messages_sender_id ON messages(sender_id);
+      CREATE INDEX IF NOT EXISTS idx_messages_receiver_id ON messages(receiver_id);
+      CREATE INDEX IF NOT EXISTS idx_messages_created_at ON messages(created_at);
+      CREATE INDEX IF NOT EXISTS idx_blocks_blocker_id ON blocks(blocker_id);
+      CREATE INDEX IF NOT EXISTS idx_blocks_blocked_id ON blocks(blocked_id);
+      CREATE INDEX IF NOT EXISTS idx_following_follower_id ON following(follower_id);
+      CREATE INDEX IF NOT EXISTS idx_following_following_id ON following(following_id);
+    `)
+    console.log('✅ Chat indexes created')
+
+    // Add message tracking columns if not exist
+    try {
+      await pool.query(`ALTER TABLE messages ADD COLUMN IF NOT EXISTS is_deleted BOOLEAN DEFAULT false`)
+      await pool.query(`ALTER TABLE messages ADD COLUMN IF NOT EXISTS delivered_at TIMESTAMP`)
+      await pool.query(`ALTER TABLE messages ADD COLUMN IF NOT EXISTS read_at TIMESTAMP`)
+      await pool.query(`ALTER TABLE messages ADD COLUMN IF NOT EXISTS deleted_at TIMESTAMP`)
+      console.log('✅ Message tracking columns added')
+    } catch (err) {
+      console.log('ℹ️ Message tracking columns may already exist')
+    }
+
     console.log('🎉 Database migration completed successfully!')
     process.exit(0)
   } catch (error) {
