@@ -31,6 +31,7 @@ const Chat = () => {
   const [newMessage, setNewMessage] = useState('')
   const [searchQuery, setSearchQuery] = useState('')
   const [loading, setLoading] = useState(true)
+  const [isSendingMessage, setIsSendingMessage] = useState(false)
   const [showUserSearch, setShowUserSearch] = useState(false)
   const [showAddFriendModal, setShowAddFriendModal] = useState(false)
   const [modalSearchQuery, setModalSearchQuery] = useState('')
@@ -66,19 +67,80 @@ const Chat = () => {
   useEffect(() => {
     if (!user) return
 
-    socketRef.current = io(API_URL, {
+    socketRef.current = io(API_URL.replace('/api', ''), {
       withCredentials: true,
       transports: ['websocket', 'polling']
     })
 
     socketRef.current.on('connect', () => {
+      console.log('✅ Socket connected! Joining room for user:', user.id)
       socketRef.current.emit('join', user.id)
     })
 
+    socketRef.current.on('connect_error', (error) => {
+      console.error('❌ Socket connection error:', error)
+    })
+
+    socketRef.current.on('disconnect', (reason) => {
+      console.log('⚠️ Socket disconnected:', reason)
+    })
+
     socketRef.current.on('new_message', (data) => {
+      console.log('📨 New message received via socket:', data)
       const currentSelectedFriend = selectedFriendRef.current
-      if (currentSelectedFriend && (data.senderId === currentSelectedFriend.friend_id || data.receiverId === currentSelectedFriend.friend_id)) {
-        setMessages(prev => [...prev, data])
+      const userId = user?.id
+
+      // Extract IDs from data (handle both snake_case and camelCase from backend/frontend)
+      const senderId = data.sender_id || data.senderId
+      const receiverId = data.receiver_id || data.receiverId
+
+      console.log('📨 DEBUG - selectedFriendRef.current:', selectedFriendRef.current)
+      console.log('📨 DEBUG - user?.id:', user?.id)
+      console.log('📨 Current selected friend ID:', currentSelectedFriend?.friend_id)
+      console.log('📨 Current selected friend name:', currentSelectedFriend?.name)
+      console.log('📨 Sender ID:', senderId, 'Receiver ID:', receiverId)
+      console.log('📨 Current user ID:', userId)
+
+      // Check if this message belongs to currently open chat
+      // The message is relevant if:
+      // 1. We have a selected friend
+      // 2. The sender or receiver of the message is that friend (meaning this is the chat between us and that friend)
+      const isRelevantChat = currentSelectedFriend && userId &&
+        ((senderId === currentSelectedFriend.friend_id && receiverId === userId) ||
+         (senderId === userId && receiverId === currentSelectedFriend.friend_id))
+
+      console.log('📨 Is relevant chat:', isRelevantChat)
+      console.log('📨 Condition check - senderId === friend_id:', senderId === currentSelectedFriend?.friend_id)
+      console.log('📨 Condition check - receiverId === userId:', receiverId === userId)
+
+      if (isRelevantChat) {
+        console.log('✅ Adding message to current chat')
+        // Transform data to match expected format
+        const formattedMessage = {
+          id: data.id || Date.now(),
+          sender_id: senderId,
+          receiver_id: receiverId,
+          content: data.content || '',
+          image_url: data.image_url || data.imageUrl || null,
+          audio_url: data.audio_url || data.audioUrl || null,
+          sender_name: data.sender_name || data.senderName || (senderId === userId ? user?.name : currentSelectedFriend?.name) || 'Unknown',
+          sender_image: data.sender_image || data.senderImage || null,
+          created_at: data.created_at || data.createdAt || new Date().toISOString(),
+          is_read: data.is_read || false,
+          is_delivered: data.is_delivered || false
+        }
+        setMessages(prev => {
+          // Check if message already exists to prevent duplicates
+          const exists = prev.some(msg => msg.id === formattedMessage.id)
+          if (exists) {
+            console.log('⚠️ Message already exists, skipping')
+            return prev
+          }
+          console.log('✅ Message added to state')
+          return [...prev, formattedMessage]
+        })
+      } else {
+        console.log('❌ Message not for current chat, only updating conversations list')
       }
       fetchRecentConversations()
     })
@@ -89,8 +151,16 @@ const Chat = () => {
     })
 
     socketRef.current.on('friend_request_accepted', (data) => {
+      console.log('🎉 Friend request accepted:', data)
       fetchFriends()
-      showToast(`${data?.receiverName || 'Someone'} accepted your friend request!`, 'success')
+      fetchRecentConversations()
+
+      // Show appropriate toast based on who received the event
+      const isAccepter = data.accepterId === user?.id
+      const toastMessage = isAccepter
+        ? `You accepted ${data.requesterName}'s friend request!`
+        : `${data.accepterName || 'Someone'} accepted your friend request!`
+      showToast(toastMessage, 'success')
     })
 
     socketRef.current.on('typing', (data) => {
@@ -242,6 +312,14 @@ const Chat = () => {
       setSelectedFriend(friend)
       const response = await chatAPI.getConversation(friend.friend_id)
       setMessages(response.data.messages || [])
+      // Clear unread count for this conversation to remove the badge
+      setRecentConversations(prev =>
+        prev.map(conv =>
+          conv.other_user_id === friend.friend_id
+            ? { ...conv, unread_count: 0 }
+            : conv
+        )
+      )
     } catch (error) {
       console.error('Error fetching conversation:', error)
       showToast(error.response?.data?.message || 'Failed to load conversation', 'error')
@@ -261,25 +339,38 @@ const Chat = () => {
   }
 
   const sendMessage = async () => {
-    if (!newMessage.trim() || !selectedFriend) return
+    if (!newMessage.trim() || !selectedFriend || isSendingMessage) return
 
+    setIsSendingMessage(true)
     try {
       const response = await chatAPI.sendMessage(selectedFriend.friend_id, newMessage)
       const messageData = response.data.data
 
-      // Emit via socket for real-time
-      socketRef.current?.emit('send_message', {
-        ...messageData,
-        senderName: user.name,
-        senderImage: user.profile_image
-      })
+      console.log('📤 Message sent via API:', messageData)
 
-      setMessages(prev => [...prev, { ...messageData, sender_name: user.name, sender_image: user.profile_image }])
+      // Backend now emits socket event, so we just add to local state
+      // This prevents duplicate messages since backend will also emit via socket
+      const formattedMessage = {
+        ...messageData,
+        sender_id: user.id,
+        receiver_id: selectedFriend.friend_id,
+        sender_name: user.name,
+        sender_image: user.profile_image
+      }
+
+      setMessages(prev => {
+        // Check if message already exists (from socket)
+        const exists = prev.some(msg => msg.id === formattedMessage.id)
+        if (exists) return prev
+        return [...prev, formattedMessage]
+      })
       setNewMessage('')
       fetchRecentConversations()
     } catch (error) {
       console.error('Error sending message:', error)
       showToast(error.response?.data?.message || 'Failed to send message', 'error')
+    } finally {
+      setIsSendingMessage(false)
     }
   }
 
@@ -327,18 +418,21 @@ const Chat = () => {
     }
   }
 
-  const acceptFriendRequest = async (requestId) => {
+  const acceptFriendRequest = async (requestId, senderUserId) => {
     try {
       const response = await chatAPI.acceptFriendRequest(requestId)
       showToast(response.data?.message || 'Friend request accepted!', 'success')
       // Refresh lists
       await Promise.all([fetchPendingRequests(), fetchFriends()])
-      // Emit socket event after successful API call
+      // Emit socket event to notify BOTH users
       if (socketRef.current?.connected) {
+        console.log('🎉 Emitting friend_request_accepted to sender:', senderUserId, 'and receiver:', user.id)
         socketRef.current.emit('friend_request_accepted', {
           requestId,
-          senderId: user.id,
-          receiverName: user.name
+          accepterId: user.id,
+          accepterName: user.name,
+          requesterId: senderUserId, // Original sender of friend request
+          requesterName: response.data?.friend?.name || 'Friend'
         })
       }
     } catch (error) {
@@ -483,21 +577,32 @@ const Chat = () => {
 
   // Send image message
   const sendImageMessage = async () => {
-    if (!imagePreview || !selectedFriend) return
+    if (!imagePreview || !selectedFriend || isSendingMessage) return
+    setIsSendingMessage(true)
     try {
       const response = await chatAPI.sendMessage(selectedFriend.friend_id, null, imagePreview)
       const messageData = response.data.data
-      socketRef.current?.emit('send_message', {
-        ...messageData,
-        senderName: user.name,
-        senderImage: user.profile_image
+
+      // Backend now emits socket event
+      setMessages(prev => {
+        const formattedMessage = {
+          ...messageData,
+          sender_id: user.id,
+          receiver_id: selectedFriend.friend_id,
+          sender_name: user.name,
+          sender_image: user.profile_image
+        }
+        const exists = prev.some(msg => msg.id === formattedMessage.id)
+        if (exists) return prev
+        return [...prev, formattedMessage]
       })
-      setMessages(prev => [...prev, { ...messageData, sender_name: user.name, sender_image: user.profile_image }])
       setImagePreview(null)
       fetchRecentConversations()
     } catch (error) {
       console.error('Error sending image:', error)
       showToast('Failed to send image', 'error')
+    } finally {
+      setIsSendingMessage(false)
     }
   }
 
@@ -542,8 +647,9 @@ const Chat = () => {
   }
 
   const sendVoiceMessage = async () => {
-    if (!audioBlobRef.current || !audioPreview || !selectedFriend) return
+    if (!audioBlobRef.current || !audioPreview || !selectedFriend || isSendingMessage) return
 
+    setIsSendingMessage(true)
     try {
       const reader = new FileReader()
       reader.onloadend = async () => {
@@ -551,12 +657,20 @@ const Chat = () => {
         try {
           const response = await chatAPI.sendMessage(selectedFriend.friend_id, null, base64Audio)
           const messageData = response.data.data
-          socketRef.current?.emit('send_message', {
-            ...messageData,
-            senderName: user.name,
-            senderImage: user.profile_image
+
+          // Backend now emits socket event
+          setMessages(prev => {
+            const formattedMessage = {
+              ...messageData,
+              sender_id: user.id,
+              receiver_id: selectedFriend.friend_id,
+              sender_name: user.name,
+              sender_image: user.profile_image
+            }
+            const exists = prev.some(msg => msg.id === formattedMessage.id)
+            if (exists) return prev
+            return [...prev, formattedMessage]
           })
-          setMessages(prev => [...prev, { ...messageData, sender_name: user.name, sender_image: user.profile_image }])
           fetchRecentConversations()
           // Clear preview after sending
           setAudioPreview(null)
@@ -564,12 +678,15 @@ const Chat = () => {
         } catch (error) {
           console.error('Error sending voice:', error)
           showToast('Failed to send voice message', 'error')
+        } finally {
+          setIsSendingMessage(false)
         }
       }
       reader.readAsDataURL(audioBlobRef.current)
     } catch (error) {
       console.error('Error reading audio:', error)
       showToast('Failed to process audio', 'error')
+      setIsSendingMessage(false)
     }
   }
 
@@ -972,7 +1089,7 @@ const Chat = () => {
                       sendMessage()
                     }
                   }}
-                  disabled={!newMessage.trim() && !imagePreview && !audioPreview}
+                  disabled={(!newMessage.trim() && !imagePreview && !audioPreview) || isSendingMessage}
                   className="p-2 bg-blue-600 text-white rounded-full hover:bg-blue-700 disabled:opacity-50"
                   title={audioPreview ? (t('sendVoice') || 'Send Voice') : imagePreview ? (t('sendImage') || 'Send Image') : (t('sendMessage') || 'Send Message')}
                 >
@@ -1017,7 +1134,7 @@ const Chat = () => {
                 </div>
                 <div className="flex items-center gap-2">
                   <button
-                    onClick={() => acceptFriendRequest(req.id)}
+                    onClick={() => acceptFriendRequest(req.id, req.user_id)}
                     className="p-2 rounded-full bg-green-100 text-green-600 hover:bg-green-200"
                     title={t('acceptRequest') || 'Accept Request'}
                   >

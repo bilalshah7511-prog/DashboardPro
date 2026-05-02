@@ -34,11 +34,19 @@ const Navbar = ({ setSidebarOpen, onEditProfile }) => {
   const [loadingMessages, setLoadingMessages] = useState(false)
   const messagesRef = useRef(null)
   const [activeChatUser, setActiveChatUser] = useState(null)
+  const [activeMessageTab, setActiveMessageTab] = useState('unread') // 'unread', 'read', 'all'
 
   // Filter notifications based on active tab
   const filteredNotifications = notifications.filter(n => {
     if (activeNotifTab === 'unread') return !n.is_read
     return n.is_read
+  })
+
+  // Filter messages based on active tab
+  const filteredMessageConversations = messageConversations.filter(conv => {
+    if (activeMessageTab === 'unread') return conv.unread_count > 0
+    if (activeMessageTab === 'read') return conv.unread_count === 0
+    return true // 'all' tab
   })
 
   // Handle scroll for infinite scroll in all notifications modal
@@ -397,18 +405,44 @@ const Navbar = ({ setSidebarOpen, onEditProfile }) => {
           </button>
 
           {showMessages && (
-            <div className="absolute right-0 mt-2 w-80 bg-white dark:bg-gray-800 rounded-lg shadow-xl border border-gray-200 dark:border-gray-700 z-50 max-h-[450px] overflow-hidden flex flex-col">
-              {/* Header */}
-              <div className="px-4 py-3 border-b border-gray-200 dark:border-gray-700 flex items-center justify-between">
+            <div className="absolute right-0 mt-2 w-96 bg-white dark:bg-gray-800 rounded-lg shadow-xl border border-gray-200 dark:border-gray-700 z-50 max-h-[500px] overflow-hidden flex flex-col">
+              {/* Header Title */}
+              <div className="px-4 py-3 border-b border-gray-200 dark:border-gray-700">
                 <h3 className="font-bold text-lg text-gray-800 dark:text-white">{t('messages') || 'Messages'}</h3>
-                {unreadMessageCount > 0 && (
-                  <button
-                    onClick={() => navigate('/chat')}
-                    className="text-xs text-green-600 hover:text-green-700 font-medium"
-                  >
-                    {t('viewAll')}
-                  </button>
-                )}
+              </div>
+
+              {/* Tabs - Unread / Read / View All */}
+              <div className="flex px-4 py-2 gap-2 border-b border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-700/50">
+                <button
+                  onClick={() => setActiveMessageTab('unread')}
+                  className={`px-4 py-1.5 rounded-full text-sm font-medium transition ${
+                    activeMessageTab === 'unread'
+                      ? 'bg-green-600 text-white'
+                      : 'bg-white dark:bg-gray-600 text-gray-700 dark:text-gray-300 border border-gray-300 dark:border-gray-500'
+                  }`}
+                >
+                  {t('unread')} ({unreadMessageCount})
+                </button>
+                <button
+                  onClick={() => setActiveMessageTab('read')}
+                  className={`px-4 py-1.5 rounded-full text-sm font-medium transition ${
+                    activeMessageTab === 'read'
+                      ? 'bg-green-600 text-white'
+                      : 'bg-white dark:bg-gray-600 text-gray-700 dark:text-gray-300 border border-gray-300 dark:border-gray-500'
+                  }`}
+                >
+                  {t('read')} ({messageConversations.length - unreadMessageCount})
+                </button>
+                <button
+                  onClick={() => setActiveMessageTab('all')}
+                  className={`px-4 py-1.5 rounded-full text-sm font-medium transition ${
+                    activeMessageTab === 'all'
+                      ? 'bg-green-600 text-white'
+                      : 'bg-white dark:bg-gray-600 text-gray-700 dark:text-gray-300 border border-gray-300 dark:border-gray-500'
+                  }`}
+                >
+                  {t('viewAll') || 'View All'}
+                </button>
               </div>
 
               {/* Message List */}
@@ -417,27 +451,36 @@ const Navbar = ({ setSidebarOpen, onEditProfile }) => {
                   <div className="flex items-center justify-center py-8">
                     <div className="w-6 h-6 border-2 border-green-600 border-t-transparent rounded-full animate-spin" />
                   </div>
-                ) : messageConversations.length === 0 ? (
-                  <div className="px-4 py-8 text-center">
-                    <MdChat className="w-12 h-12 text-gray-300 dark:text-gray-600 mx-auto mb-3" />
-                    <p className="text-gray-500 dark:text-gray-400 text-sm">{t('noMessages') || 'No messages yet'}</p>
-                    <button
-                      onClick={() => {
-                        setShowMessages(false)
-                        navigate('/chat')
-                      }}
-                      className="mt-3 text-green-600 hover:text-green-700 text-sm font-medium"
-                    >
-                      {t('startChat') || 'Start Chat'}
-                    </button>
+                ) : filteredMessageConversations.length === 0 ? (
+                  <div className="px-4 py-4">
+                    <div className="text-center">
+                      <MdChat className="w-12 h-12 text-gray-300 dark:text-gray-600 mx-auto mb-3" />
+                      <p className="text-gray-500 dark:text-gray-400 text-sm">
+                        {activeMessageTab === 'unread'
+                          ? (t('noUnreadMessages') || 'No unread messages')
+                          : activeMessageTab === 'read'
+                            ? (t('noReadMessages') || 'No read messages')
+                            : (t('noMessages') || 'No messages yet')
+                        }
+                      </p>
+                      <button
+                        onClick={() => {
+                          setShowMessages(false)
+                          navigate('/chat')
+                        }}
+                        className="mt-3 text-green-600 hover:text-green-700 text-sm font-medium"
+                      >
+                        {t('startChat') || 'Start Chat'}
+                      </button>
+                    </div>
                   </div>
                 ) : (
-                  messageConversations.map((conv) => (
+                  filteredMessageConversations.map((conv) => (
                     <div
                       key={conv.other_user_id}
                       onClick={() => handleMessageClick(conv)}
                       className={`px-4 py-3 border-b border-gray-100 dark:border-gray-700 cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-700 transition ${
-                        conv.unread_count > 0 ? 'bg-green-50/50 dark:bg-green-900/10' : ''
+                        conv.unread_count > 0 ? 'bg-green-50/50 dark:bg-green-900/10' : 'bg-gray-50/50 dark:bg-gray-700/50'
                       }`}
                     >
                       <div className="flex items-start gap-3">

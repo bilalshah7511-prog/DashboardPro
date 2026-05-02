@@ -44,6 +44,9 @@ const io = new Server(httpServer, {
   }
 })
 
+// Make io accessible to controllers
+app.set('io', io)
+
 // Middleware
 app.use(helmet())
 app.use(cors({
@@ -89,7 +92,8 @@ io.on('connection', (socket) => {
   socket.on('join', (userId) => {
     socket.join(`user_${userId}`)
     connectedUserId = userId
-    console.log(`User ${userId} joined their room`)
+    console.log(`✅ User ${userId} joined room user_${userId}. Socket ID: ${socket.id}`)
+    console.log(`📋 Current socket rooms:`, Array.from(socket.rooms))
     // Broadcast online status to all users (they can filter by their friends)
     io.emit('user_online', { userId })
   })
@@ -135,10 +139,17 @@ io.on('connection', (socket) => {
 
   // Chat events
   socket.on('send_message', (data) => {
+    console.log('📨 Server received send_message:', data)
+    const receiverId = data.receiver_id || data.receiverId
+    const senderId = data.sender_id || data.senderId
+
     // Emit to receiver's room
-    io.to(`user_${data.receiverId}`).emit('new_message', data)
+    console.log(`📨 Emitting to user_${receiverId}`)
+    io.to(`user_${receiverId}`).emit('new_message', data)
+
     // Also emit to sender's room for sync across devices
-    io.to(`user_${data.senderId}`).emit('new_message', data)
+    console.log(`📨 Emitting to user_${senderId}`)
+    io.to(`user_${senderId}`).emit('new_message', data)
   })
 
   socket.on('friend_request_sent', (data) => {
@@ -146,7 +157,20 @@ io.on('connection', (socket) => {
   })
 
   socket.on('friend_request_accepted', (data) => {
-    io.to(`user_${data.senderId}`).emit('friend_request_accepted', data)
+    console.log('🎉 Server received friend_request_accepted:', data)
+    // Notify the user who sent the original request (requester)
+    if (data.requesterId) {
+      console.log(`🎉 Emitting to requester user_${data.requesterId}`)
+      io.to(`user_${data.requesterId}`).emit('friend_request_accepted', {
+        ...data,
+        receiverName: data.accepterName // For backward compatibility
+      })
+    }
+    // Also notify the user who accepted (accepter)
+    if (data.accepterId) {
+      console.log(`🎉 Emitting to accepter user_${data.accepterId}`)
+      io.to(`user_${data.accepterId}`).emit('friend_request_accepted', data)
+    }
   })
 
   socket.on('typing', (data) => {

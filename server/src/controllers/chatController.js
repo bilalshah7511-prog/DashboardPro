@@ -304,7 +304,36 @@ export const sendMessage = async (req, res) => {
       [senderId, receiverId, content || null, imageUrl || null]
     )
 
-    res.status(201).json({ message: 'Message sent', data: result.rows[0] })
+    const messageData = result.rows[0]
+
+    // Get sender info for socket emit
+    const senderResult = await pool.query(
+      'SELECT name, profile_image FROM users WHERE id = $1',
+      [senderId]
+    )
+    const senderInfo = senderResult.rows[0] || {}
+
+    // Emit socket event to both sender and receiver for real-time updates
+    const io = req.app.get('io')
+    console.log('📤 Backend - io instance:', io ? 'Available' : 'NOT AVAILABLE')
+    if (io) {
+      console.log('📤 Backend emitting new_message to sender:', senderId, 'and receiver:', receiverId)
+      const socketData = {
+        ...messageData,
+        sender_name: senderInfo.name,
+        sender_image: senderInfo.profile_image
+      }
+      console.log('📤 Backend - socketData:', socketData)
+      console.log('📤 Backend - Emitting to room: user_' + receiverId)
+      io.to(`user_${receiverId}`).emit('new_message', socketData)
+      console.log('📤 Backend - Emitting to room: user_' + senderId)
+      io.to(`user_${senderId}`).emit('new_message', socketData)
+      console.log('📤 Backend - Emits completed')
+    } else {
+      console.error('❌ Backend - io instance not available! Socket emit skipped.')
+    }
+
+    res.status(201).json({ message: 'Message sent', data: messageData })
   } catch (error) {
     console.error('Send message error:', error)
     res.status(500).json({ message: 'Server error' })
