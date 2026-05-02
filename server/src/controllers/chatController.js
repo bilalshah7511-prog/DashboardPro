@@ -719,3 +719,33 @@ export const getUnreadCount = async (req, res) => {
     res.status(500).json({ message: 'Server error' })
   }
 }
+
+// Mark all messages from a sender as read
+export const markMessagesAsRead = async (req, res) => {
+  try {
+    const userId = req.user.id
+    const { senderId } = req.body
+
+    if (!senderId) {
+      return res.status(400).json({ message: 'Sender ID is required' })
+    }
+
+    // Mark all messages from sender to current user as read
+    const result = await pool.query(
+      `UPDATE messages 
+       SET is_read = true, read_at = CURRENT_TIMESTAMP 
+       WHERE sender_id = $1 AND receiver_id = $2 AND is_read = false
+       RETURNING *`,
+      [senderId, userId]
+    )
+
+    res.json({ 
+      message: 'Messages marked as read', 
+      markedCount: result.rowCount,
+      messages: result.rows 
+    })
+  } catch (error) {
+    console.error('Mark messages as read error:', error)
+    res.status(500).json({ message: 'Server error' })
+  }
+}

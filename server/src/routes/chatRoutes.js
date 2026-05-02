@@ -24,7 +24,8 @@ import {
   getAllMessages,
   getAdminConversation,
   getAllUserConversations,
-  getUnreadCount
+  getUnreadCount,
+  markMessagesAsRead
 } from '../controllers/chatController.js'
 
 const router = express.Router()
@@ -50,6 +51,7 @@ router.delete('/messages/:messageId', verifyToken, deleteMessage)
 router.delete('/messages/:messageId/everyone', verifyToken, deleteMessageForEveryone)
 router.get('/messages/:messageId/info', verifyToken, getMessageInfo)
 router.get('/messages/unread-count', verifyToken, getUnreadCount)
+router.post('/messages/mark-read', verifyToken, markMessagesAsRead)
 
 // Follow routes
 router.post('/follow', verifyToken, followUser)

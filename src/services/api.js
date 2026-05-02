@@ -153,6 +153,7 @@ export const chatAPI = {
   deleteMessageForEveryone: (messageId) => api.delete(`/chat/messages/${messageId}/everyone`),
   getMessageInfo: (messageId) => api.get(`/chat/messages/${messageId}/info`),
   getUnreadCount: () => api.get('/chat/messages/unread-count'),
+  markMessagesAsRead: (senderId) => api.post('/chat/messages/mark-read', { senderId }),
 
   // Follow
   followUser: (followingId) => api.post('/chat/follow', { followingId }),

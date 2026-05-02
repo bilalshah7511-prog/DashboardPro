@@ -139,10 +139,32 @@ const Chat = () => {
           console.log('✅ Message added to state')
           return [...prev, formattedMessage]
         })
+
+        // If message is from friend (not our own message), mark as read since chat is open
+        if (senderId === currentSelectedFriend.friend_id && receiverId === userId) {
+          console.log('✅ Chat is open, marking messages from this friend as read')
+          // Mark messages as read in backend
+          chatAPI.markMessagesAsRead(senderId).catch(err => console.error('Error marking as read:', err))
+          
+          // Update local state to clear unread count for this conversation
+          setRecentConversations(prev => prev.map(conv => {
+            if (conv.friend_id === senderId) {
+              return { ...conv, unread_count: 0 }
+            }
+            return conv
+          }))
+        }
       } else {
         console.log('❌ Message not for current chat, only updating conversations list')
       }
-      fetchRecentConversations()
+      
+      // Only fetch conversations if message is from someone else (not our own message)
+      // This prevents the temporary count increase when we send a message
+      if (senderId !== userId) {
+        fetchRecentConversations()
+      } else {
+        console.log('📨 Own message received via socket, skipping conversation list update')
+      }
     })
 
     socketRef.current.on('new_friend_request', (data) => {
@@ -864,7 +886,7 @@ const Chat = () => {
             <div className={`flex-1 overflow-y-auto p-4 space-y-3 ${isDark ? 'bg-gray-900/50' : 'bg-gray-50'}`}>
               {messages.map((msg, index) => {
                 const isMe = msg.sender_id === user.id
-                const showAvatar = index === 0 || messages[index - 1].sender_id !== msg.sender_id
+                const showAvatar = true
 
                 return (
                   <div key={msg.id} className={`flex ${isMe ? 'justify-end' : 'justify-start'}`}>
