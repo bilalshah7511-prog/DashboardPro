@@ -184,7 +184,10 @@ io.on('connection', (socket) => {
     console.log('❌ Client disconnected:', socket.id)
     // Broadcast offline status if user was connected
     if (connectedUserId) {
-      io.emit('user_offline', { userId: connectedUserId })
+      io.emit('user_offline', { 
+        userId: connectedUserId,
+        lastActive: new Date().toISOString()
+      })
     }
   })
 })

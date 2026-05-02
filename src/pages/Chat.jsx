@@ -49,6 +49,7 @@ const Chat = () => {
   const [deleteConfirmModal, setDeleteConfirmModal] = useState(null)
   const [imagePreviewModal, setImagePreviewModal] = useState(null)
   const [onlineUsers, setOnlineUsers] = useState(new Set())
+  const [lastActiveTimes, setLastActiveTimes] = useState({})
   const messagesEndRef = useRef(null)
   const socketRef = useRef(null)
   const selectedFriendRef = useRef(null)
@@ -195,6 +196,12 @@ const Chat = () => {
     // Online status tracking
     socketRef.current.on('user_online', (data) => {
       setOnlineUsers(prev => new Set([...prev, data.userId]))
+      // Remove last active time when user comes online
+      setLastActiveTimes(prev => {
+        const newTimes = { ...prev }
+        delete newTimes[data.userId]
+        return newTimes
+      })
     })
 
     socketRef.current.on('user_offline', (data) => {
@@ -203,6 +210,11 @@ const Chat = () => {
         newSet.delete(data.userId)
         return newSet
       })
+      // Store last active time when user goes offline
+      setLastActiveTimes(prev => ({
+        ...prev,
+        [data.userId]: data.lastActive || new Date().toISOString()
+      }))
     })
 
     return () => {
@@ -249,6 +261,31 @@ const Chat = () => {
       setActiveTab(location.state.activeTab)
     }
   }, [location.state?.activeTab])
+
+  // Helper function to format last active time
+  const formatLastActive = (timestamp) => {
+    if (!timestamp) return 'Offline'
+    const now = new Date()
+    const lastActive = new Date(timestamp)
+    const diffMs = now - lastActive
+    const diffMins = Math.floor(diffMs / 60000)
+    const diffHours = Math.floor(diffMs / 3600000)
+    const diffDays = Math.floor(diffMs / 86400000)
+
+    if (diffMins < 1) return 'just now'
+    if (diffMins < 60) return `${diffMins} min ago`
+    if (diffHours === 1) return '1 hour ago'
+    if (diffHours < 24) return `${diffHours} hours ago`
+    if (diffDays === 1) return 'Yesterday'
+    if (diffDays === 2) return '2 days ago'
+    if (diffDays < 7) return `${diffDays} days ago`
+    // Format: 01/May/2026
+    const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
+    const day = lastActive.getDate().toString().padStart(2, '0')
+    const month = months[lastActive.getMonth()]
+    const year = lastActive.getFullYear()
+    return `${day}/${month}/${year}`
+  }
 
   const fetchData = async () => {
     setLoading(true)
@@ -799,19 +836,34 @@ const Chat = () => {
                   : (isDark ? 'hover:bg-gray-700' : 'hover:bg-gray-50')
               }`}
             >
-              {conv.other_user_image ? (
-                <img src={conv.other_user_image} alt={conv.other_user_name} className="w-10 h-10 rounded-full" />
-              ) : (
-                <div className="w-10 h-10 rounded-full bg-blue-600 flex items-center justify-center text-white">
-                  {conv.other_user_name?.charAt(0).toUpperCase()}
-                </div>
-              )}
+              <div className="relative">
+                {conv.other_user_image ? (
+                  <img src={conv.other_user_image} alt={conv.other_user_name} className="w-10 h-10 rounded-full" />
+                ) : (
+                  <div className="w-10 h-10 rounded-full bg-blue-600 flex items-center justify-center text-white">
+                    {conv.other_user_name?.charAt(0).toUpperCase()}
+                  </div>
+                )}
+                {/* Online indicator */}
+                {onlineUsers.has(conv.other_user_id) && (
+                  <span className="absolute -bottom-0.5 -right-0.5 w-3 h-3 bg-green-500 border-2 border-white dark:border-gray-700 rounded-full"></span>
+                )}
+              </div>
               <div className="flex-1 min-w-0">
                 <p className={`font-medium truncate ${isDark ? 'text-white' : 'text-gray-800'}`}>
                   {conv.other_user_name}
                 </p>
                 <p className={`text-xs truncate ${isDark ? 'text-gray-400' : 'text-gray-500'}`}>
-                  {conv.last_message?.substring(0, 30)}{conv.last_message?.length > 30 ? '...' : ''}
+                  {onlineUsers.has(conv.other_user_id) ? (
+                    <span className="text-green-500">{t('online') || 'Online'}</span>
+                  ) : (
+                    <>
+                      {lastActiveTimes[conv.other_user_id] 
+                        ? `Offline • ${formatLastActive(lastActiveTimes[conv.other_user_id])}`
+                        : (conv.last_message?.substring(0, 30) + (conv.last_message?.length > 30 ? '...' : '') || (t('offline') || 'Offline'))
+                      }
+                    </>
+                  )}
                 </p>
               </div>
               {conv.unread_count > 0 && (
@@ -839,18 +891,27 @@ const Chat = () => {
                       {selectedFriend.name?.charAt(0).toUpperCase()}
                     </div>
                   )}
-                  {/* Online indicator - only in chat tab */}
-                  {activeTab === 'chat' && onlineUsers.has(selectedFriend.friend_id) && (
+                  {/* Online indicator */}
+                  {onlineUsers.has(selectedFriend.friend_id) && (
                     <span className="absolute -bottom-0.5 -right-0.5 w-3 h-3 bg-green-500 border-2 border-white dark:border-gray-800 rounded-full"></span>
                   )}
                 </div>
                 <div>
                   <p className={`font-semibold ${isDark ? 'text-white' : 'text-gray-800'}`}>{selectedFriend.name}</p>
-                  {activeTab === 'chat' && onlineUsers.has(selectedFriend.friend_id) ? (
-                    <p className="text-xs text-green-500">{t('online') || 'Online'}</p>
+                  {onlineUsers.has(selectedFriend.friend_id) ? (
+                    <p className="text-xs text-green-500">
+                      {t('online') || 'Online'}
+                    </p>
                   ) : typingUsers[selectedFriend.friend_id] ? (
                     <p className="text-xs text-green-500">{t('typing')}...</p>
-                  ) : null}
+                  ) : (
+                    <p className={`text-xs ${isDark ? 'text-gray-400' : 'text-gray-500'}`}>
+                      {lastActiveTimes[selectedFriend?.friend_id] 
+                        ? `Offline • ${formatLastActive(lastActiveTimes[selectedFriend.friend_id])}`
+                        : (t('offline') || 'Offline')
+                      }
+                    </p>
+                  )}
                 </div>
               </div>
               <div className="flex items-center gap-2">
@@ -1184,16 +1245,31 @@ const Chat = () => {
           {friends.map(friend => (
             <div key={friend.id} className={`p-4 rounded-lg ${isDark ? 'bg-gray-700' : 'bg-gray-50'}`}>
               <div className="flex items-center gap-3 mb-3">
-                {friend.profile_image ? (
-                  <img src={friend.profile_image} alt={friend.name} className="w-12 h-12 rounded-full" />
-                ) : (
-                  <div className="w-12 h-12 rounded-full bg-blue-600 flex items-center justify-center text-white text-lg">
-                    {friend.name.charAt(0).toUpperCase()}
-                  </div>
-                )}
+                <div className="relative">
+                  {friend.profile_image ? (
+                    <img src={friend.profile_image} alt={friend.name} className="w-12 h-12 rounded-full" />
+                  ) : (
+                    <div className="w-12 h-12 rounded-full bg-blue-600 flex items-center justify-center text-white text-lg">
+                      {friend.name.charAt(0).toUpperCase()}
+                    </div>
+                  )}
+                  {/* Online indicator */}
+                  {onlineUsers.has(friend.friend_id) && (
+                    <span className="absolute -bottom-0.5 -right-0.5 w-3 h-3 bg-green-500 border-2 border-white dark:border-gray-700 rounded-full"></span>
+                  )}
+                </div>
                 <div>
                   <p className={`font-medium ${isDark ? 'text-gray-200' : 'text-gray-800'}`}>{friend.name}</p>
-                  <p className={`text-xs ${isDark ? 'text-gray-400' : 'text-gray-500'}`}>{friend.email}</p>
+                  {onlineUsers.has(friend.friend_id) ? (
+                    <p className="text-xs text-green-500">{t('online') || 'Online'}</p>
+                  ) : (
+                    <p className={`text-xs ${isDark ? 'text-gray-400' : 'text-gray-500'}`}>
+                      {lastActiveTimes[friend.friend_id] 
+                        ? `Offline • ${formatLastActive(lastActiveTimes[friend.friend_id])}`
+                        : (t('offline') || 'Offline')
+                      }
+                    </p>
+                  )}
                 </div>
               </div>
               <div className="flex items-center gap-2">
