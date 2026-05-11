@@ -24,6 +24,32 @@ api.interceptors.request.use(
   }
 )
 
+// Handle database connection errors with retry
+api.interceptors.response.use(
+  (response) => response,
+  async (error) => {
+    const originalRequest = error.config
+    
+    // If 503 (database unavailable) and not already retried
+    if (error.response?.status === 503 && !originalRequest._retry) {
+      originalRequest._retry = true
+      
+      // Wait 2 seconds before retry
+      await new Promise(resolve => setTimeout(resolve, 2000))
+      
+      console.log('🔄 Retrying request after database connection error...')
+      return api(originalRequest)
+    }
+    
+    // If still failing after retry, return proper error message
+    if (error.response?.status === 503) {
+      error.message = 'Database temporarily unavailable. Please try again.'
+    }
+    
+    return Promise.reject(error)
+  }
+)
+
 // Response interceptor to handle token refresh
 api.interceptors.response.use(
   (response) => response,

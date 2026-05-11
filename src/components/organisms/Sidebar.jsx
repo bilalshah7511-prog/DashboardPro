@@ -10,15 +10,15 @@ const Sidebar = ({ sidebarOpen, setSidebarOpen }) => {
   const { t } = useTranslation()
 
   const menuItems = [
-    { name: t('dashboard'), path: '/dashboard', icon: MdDashboard },
+    { name: t('Dashboard'), path: '/dashboard', icon: MdDashboard },
     ...(isAdmin() ? [
-      { name: t('users'), path: '/users', icon: MdPeople },
-      { name: t('profiles'), path: '/gallery', icon: MdPhotoLibrary },
-      { name: t('blogManagement'), path: '/admin/blogs', icon: MdArticle }
+      { name: t('Users'), path: '/users', icon: MdPeople },
+      { name: t('Profiles'), path: '/gallery', icon: MdPhotoLibrary },
+      { name: t('BlogManagement'), path: '/admin/blogs', icon: MdArticle }
     ] : []),
-    { name: t('blogs'), path: '/blogs', icon: MdArticle },
-    { name: t('analytics'), path: '/analytics', icon: MdAnalytics },
-    { name: t('chat'), path: '/chat', icon: MdChat }
+    { name: t('Blogs'), path: '/blogs', icon: MdArticle },
+    { name: t('Analytics'), path: '/analytics', icon: MdAnalytics },
+    { name: t('Chat'), path: '/chat', icon: MdChat }
   ]
 
   const handleLogout = async () => {

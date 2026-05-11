@@ -11,6 +11,7 @@ import {
   MdPeople, MdPerson, MdPersonRemove, MdRefresh,
   MdGroup, MdVisibility, MdMic, MdStop
 } from 'react-icons/md'
+import { ChatAdminThreadSkeleton, ChatDmThreadSkeleton, ChatPageLoadingView } from '../skeletons'
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000'
 
@@ -31,6 +32,8 @@ const Chat = () => {
   const [newMessage, setNewMessage] = useState('')
   const [searchQuery, setSearchQuery] = useState('')
   const [loading, setLoading] = useState(true)
+  const [conversationLoading, setConversationLoading] = useState(false)
+  const [adminConversationLoading, setAdminConversationLoading] = useState(false)
   const [isSendingMessage, setIsSendingMessage] = useState(false)
   const [showUserSearch, setShowUserSearch] = useState(false)
   const [showAddFriendModal, setShowAddFriendModal] = useState(false)
@@ -365,6 +368,7 @@ const Chat = () => {
   }
 
   const fetchConversation = async (friend) => {
+    setConversationLoading(true)
     try {
       // Clear previous messages and friend first to prevent old chat showing
       setMessages([])
@@ -384,16 +388,21 @@ const Chat = () => {
       showToast(error.response?.data?.message || 'Failed to load conversation', 'error')
       setSelectedFriend(null)
       setMessages([])
+    } finally {
+      setConversationLoading(false)
     }
   }
 
   const fetchAdminConversation = async (userId1, userId2) => {
+    setAdminConversationLoading(true)
     try {
       const response = await chatAPI.getAdminConversation(userId1, userId2)
       setAdminMessages(response.data.messages || [])
       setAdminSelectedConversation({ userId1, userId2 })
     } catch (error) {
       console.error('Error fetching admin conversation:', error)
+    } finally {
+      setAdminConversationLoading(false)
     }
   }
 
@@ -826,16 +835,68 @@ const Chat = () => {
             </div>
           )}
 
-          {recentConversations.map(conv => (
-            <div
-              key={conv.other_user_id}
-              onClick={() => fetchConversation({ friend_id: conv.other_user_id, name: conv.other_user_name, profile_image: conv.other_user_image })}
-              className={`flex items-center gap-3 p-3 cursor-pointer transition-colors ${
-                selectedFriend?.friend_id === conv.other_user_id
-                  ? (isDark ? 'bg-blue-900/30' : 'bg-blue-50')
-                  : (isDark ? 'hover:bg-gray-700' : 'hover:bg-gray-50')
-              }`}
-            >
+          {/* Friends List - Show all friends even without messages */}
+          {friends.length > 0 && (
+            <div className={`p-2 border-b ${isDark ? 'border-gray-700' : 'border-gray-200'}`}>
+              <p className={`text-xs mb-2 ${isDark ? 'text-gray-400' : 'text-gray-500'}`}>Friends ({friends.length})</p>
+              {friends.map(friend => (
+                <div
+                  key={friend.friend_id}
+                  onClick={() => fetchConversation(friend)}
+                  className={`flex items-center gap-3 p-2 rounded-lg cursor-pointer transition-colors ${
+                    selectedFriend?.friend_id === friend.friend_id
+                      ? (isDark ? 'bg-blue-900/30' : 'bg-blue-50')
+                      : (isDark ? 'hover:bg-gray-700' : 'hover:bg-gray-100')
+                  }`}
+                >
+                  <div className="relative">
+                    {friend.profile_image ? (
+                      <img src={friend.profile_image} alt={friend.name} className="w-8 h-8 rounded-full" />
+                    ) : (
+                      <div className="w-8 h-8 rounded-full bg-blue-600 flex items-center justify-center text-white text-sm">
+                        {friend.name?.charAt(0).toUpperCase()}
+                      </div>
+                    )}
+                    {onlineUsers.has(friend.friend_id) && (
+                      <span className="absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 bg-green-500 border-2 border-white dark:border-gray-700 rounded-full"></span>
+                    )}
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className={`font-medium truncate text-sm ${isDark ? 'text-white' : 'text-gray-800'}`}>
+                      {friend.name}
+                    </p>
+                    <p className={`text-xs truncate ${isDark ? 'text-gray-400' : 'text-gray-500'}`}>
+                      {onlineUsers.has(friend.friend_id) ? (
+                        <span className="text-green-500">Online</span>
+                      ) : (
+                        <>
+                          {lastActiveTimes[friend.friend_id] 
+                            ? `Offline • ${formatLastActive(lastActiveTimes[friend.friend_id])}`
+                            : 'Offline'
+                          }
+                        </>
+                      )}
+                    </p>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+
+          {/* Recent Conversations */}
+          {recentConversations.length > 0 && (
+            <div className={`p-2 ${friends.length > 0 ? 'mt-2' : ''}`}>
+              <p className={`text-xs mb-2 ${isDark ? 'text-gray-400' : 'text-gray-500'}`}>Recent Chats</p>
+              {recentConversations.map(conv => (
+                <div
+                  key={conv.other_user_id}
+                  onClick={() => fetchConversation({ friend_id: conv.other_user_id, name: conv.other_user_name, profile_image: conv.other_user_image })}
+                  className={`flex items-center gap-3 p-2 rounded-lg cursor-pointer transition-colors ${
+                    selectedFriend?.friend_id === conv.other_user_id
+                      ? (isDark ? 'bg-blue-900/30' : 'bg-blue-50')
+                      : (isDark ? 'hover:bg-gray-700' : 'hover:bg-gray-100')
+                  }`}
+                >
               <div className="relative">
                 {conv.other_user_image ? (
                   <img src={conv.other_user_image} alt={conv.other_user_name} className="w-10 h-10 rounded-full" />
@@ -860,7 +921,7 @@ const Chat = () => {
                     <>
                       {lastActiveTimes[conv.other_user_id] 
                         ? `Offline • ${formatLastActive(lastActiveTimes[conv.other_user_id])}`
-                        : (conv.last_message?.substring(0, 30) + (conv.last_message?.length > 30 ? '...' : '') || (t('offline') || 'Offline'))
+                        : (conv.last_message?.substring(0, 30) + (conv.last_message?.length > 30 ? '...' : '') || 'Offline')
                       }
                     </>
                   )}
@@ -873,6 +934,8 @@ const Chat = () => {
               )}
             </div>
           ))}
+        </div>
+      )}
         </div>
       </div>
 
@@ -908,7 +971,7 @@ const Chat = () => {
                     <p className={`text-xs ${isDark ? 'text-gray-400' : 'text-gray-500'}`}>
                       {lastActiveTimes[selectedFriend?.friend_id] 
                         ? `Offline • ${formatLastActive(lastActiveTimes[selectedFriend.friend_id])}`
-                        : (t('offline') || 'Offline')
+                        : 'Offline'
                       }
                     </p>
                   )}
@@ -945,6 +1008,10 @@ const Chat = () => {
 
             {/* Messages */}
             <div className={`flex-1 overflow-y-auto p-4 space-y-3 ${isDark ? 'bg-gray-900/50' : 'bg-gray-50'}`}>
+              {conversationLoading ? (
+                <ChatDmThreadSkeleton isDark={isDark} />
+              ) : (
+                <>
               {messages.map((msg, index) => {
                 const isMe = msg.sender_id === user.id
                 const showAvatar = true
@@ -1071,6 +1138,8 @@ const Chat = () => {
                 )
               })}
               <div ref={messagesEndRef} />
+                </>
+              )}
             </div>
 
             {/* Image Preview */}
@@ -1238,12 +1307,15 @@ const Chat = () => {
       </div>
 
       <div className={`border-t p-4 ${isDark ? 'border-gray-700' : 'border-gray-200'}`}>
-        <h3 className={`font-semibold mb-4 ${isDark ? 'text-white' : 'text-gray-800'}`}>
+        <h3 className={`text-lg font-semibold mb-4 ${isDark ? 'text-white' : 'text-gray-800'}`}>
           {t('allFriends')} ({friends.length})
         </h3>
+        {friends.length === 0 ? (
+          <p className={`text-sm ${isDark ? 'text-gray-400' : 'text-gray-500'}`}>No friends yet. Add friends to start chatting!</p>
+        ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
           {friends.map(friend => (
-            <div key={friend.id} className={`p-4 rounded-lg ${isDark ? 'bg-gray-700' : 'bg-gray-50'}`}>
+            <div key={friend.friend_id || friend.id} className={`p-4 rounded-lg ${isDark ? 'bg-gray-700' : 'bg-gray-50'}`}>
               <div className="flex items-center gap-3 mb-3">
                 <div className="relative">
                   {friend.profile_image ? (
@@ -1266,7 +1338,7 @@ const Chat = () => {
                     <p className={`text-xs ${isDark ? 'text-gray-400' : 'text-gray-500'}`}>
                       {lastActiveTimes[friend.friend_id] 
                         ? `Offline • ${formatLastActive(lastActiveTimes[friend.friend_id])}`
-                        : (t('offline') || 'Offline')
+                        : 'Offline'
                       }
                     </p>
                   )}
@@ -1294,6 +1366,7 @@ const Chat = () => {
             </div>
           ))}
         </div>
+        )}
       </div>
     </div>
   )
@@ -1460,7 +1533,10 @@ const Chat = () => {
               </p>
             </div>
             <div className={`flex-1 overflow-y-auto p-4 space-y-3 ${isDark ? 'bg-gray-900/50' : 'bg-gray-50'}`}>
-              {adminMessages.map((msg, index) => {
+              {adminConversationLoading ? (
+                <ChatAdminThreadSkeleton isDark={isDark} />
+              ) : (
+              adminMessages.map((msg, index) => {
                 const showAvatar = index === 0 || adminMessages[index - 1].sender_id !== msg.sender_id
                 return (
                   <div key={msg.id} className="flex justify-start">
@@ -1508,7 +1584,8 @@ const Chat = () => {
                     </div>
                   </div>
                 </div>
-              )})}
+              )})
+              )}
             </div>
           </>
         ) : (
@@ -1524,19 +1601,14 @@ const Chat = () => {
   )
 
   if (loading) {
-    return (
-      <div className="space-y-4">
-        <div className={`h-12 rounded-lg animate-pulse ${isDark ? 'bg-gray-700' : 'bg-gray-200'}`} />
-        <div className={`h-96 rounded-lg animate-pulse ${isDark ? 'bg-gray-700' : 'bg-gray-200'}`} />
-      </div>
-    )
+    return <ChatPageLoadingView isDark={isDark} activeTab={activeTab} isAdmin={isAdmin()} />
   }
 
   return (
     <div>
       <div className="mb-6">
-        <h1 className={`text-3xl font-bold ${isDark ? 'text-white' : 'text-gray-800'}`}>{t('chat')}</h1>
-        <p className={`mt-1 ${isDark ? 'text-gray-400' : 'text-gray-600'}`}>{t('chatDescription')}</p>
+        <h1 className={`text-3xl font-bold ${isDark ? 'text-white' : 'text-gray-800'}`}>{t('Messages')}</h1>
+        <p className={`mt-1 ${isDark ? 'text-gray-400' : 'text-gray-600'}`}>{t('Connect and communicate with users in real time.')}</p>
       </div>
 
       {/* Tabs */}
@@ -1550,7 +1622,7 @@ const Chat = () => {
           }`}
         >
           <MdChat size={18} />
-          {t('messages')}
+          {t('Messages')}
         </button>
         <button
           onClick={() => setActiveTab('friends')}
@@ -1561,7 +1633,7 @@ const Chat = () => {
           }`}
         >
           <MdPeople size={18} />
-          {t('friends')}
+          {t('Friends')}
           {pendingRequests.length > 0 && (
             <span className="px-1.5 py-0.5 bg-red-500 text-white text-xs rounded-full">
               {pendingRequests.length}
@@ -1577,7 +1649,7 @@ const Chat = () => {
           }`}
         >
           <MdPersonAdd size={18} />
-          {t('findFriends') || 'Find Friends'}
+          {t('Find Friends') || 'Find Friends'}
         </button>
         <button
           onClick={() => setActiveTab('blocked')}
@@ -1588,7 +1660,7 @@ const Chat = () => {
           }`}
         >
           <MdBlock size={18} />
-          {t('blocked')}
+          {t('Blocked')}
         </button>
         {isAdmin() && (
           <button
@@ -1619,7 +1691,7 @@ const Chat = () => {
             {/* Modal Header */}
             <div className={`flex items-center justify-between p-4 border-b ${isDark ? 'border-gray-700' : 'border-gray-200'}`}>
               <h3 className={`text-lg font-semibold ${isDark ? 'text-white' : 'text-gray-800'}`}>
-                {t('addFriend') || 'Add Friend'}
+                {t('Add Friend') || 'Add Friend'}
               </h3>
               <button
                 onClick={() => setShowAddFriendModal(false)}
