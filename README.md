@@ -46,6 +46,9 @@ npm run preview
 - Profile editing with image upload
 - Account information display
 
+
+
+
 ### 📈 Analytics
 - Daily login activity (Line Chart)
 - Monthly login trends (Bar Chart)
