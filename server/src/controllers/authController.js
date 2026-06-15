@@ -15,6 +15,9 @@ export const register = async (req, res) => {
       return res.status(400).json({ message: 'Email already exists' })
     }
 
+
+
+    
     // Hash password
     const hashedPassword = await bcrypt.hash(password, 10)
 
